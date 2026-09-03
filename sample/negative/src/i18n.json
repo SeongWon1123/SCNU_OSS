@@ -1,0 +1,14 @@
+{
+  "app.title": "리포닥 클리닉",
+  "app.subtitle": "저장소 진단 결과를 한 화면에서 확인하실 수 있습니다.",
+  "scan.start": "진단 시작하기",
+  "scan.running": "진단이 진행 중입니다. 잠시만 기다려 주세요.",
+  "scan.done": "진단이 완료되었습니다.",
+  "result.summary": "요약",
+  "result.detail": "상세 내역",
+  "result.retry": "다시 진단하기",
+  "form.url.placeholder": "https://github.com/organization/repository",
+  "form.consent": "검사 대상 저장소가 공개 저장소임에 동의합니다.",
+  "error.invalid_url": "올바른 GitHub 주소를 입력해 주세요.",
+  "error.unreachable": "서버에 연결할 수 없습니다. 네트워크 상태를 확인해 주세요."
+}

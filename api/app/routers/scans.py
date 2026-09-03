@@ -9,7 +9,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -210,3 +210,28 @@ def get_scan(scan_id: UUID, db: DbSession, t: str = "") -> Any:
             resp["findings"] = [_finding_dict(f) for f in partial]
             return resp
     return limited.model_dump()
+
+
+def _markdown_document(scan: Scan, column: str) -> Response:
+    """SPEC:146-147 — token-gated text/markdown; 문서가 없으면 404."""
+    document = getattr(scan, column)
+    if document is None:
+        raise HTTPException(status_code=404, detail="문서가 아직 생성되지 않았습니다")
+    return Response(content=document, media_type="text/markdown; charset=utf-8")
+
+
+@router.get("/{scan_id}/privacy-policy.md")
+def get_privacy_policy_md(scan_id: UUID, db: DbSession, t: str = "") -> Response:
+    scan = db.get(Scan, scan_id)
+    if scan is None or not secrets.compare_digest(scan.owner_token, t or ""):
+        raise HTTPException(status_code=404, detail="스캔을 찾을 수 없습니다")
+    return _markdown_document(scan, "privacy_policy_md")
+
+
+@router.get("/{scan_id}/ai-notice.md")
+def get_ai_notice_md(scan_id: UUID, db: DbSession, t: str = "") -> Response:
+    """R6 산출물만 존재(SPEC:147) — AI 고지가 없는 스캔은 404."""
+    scan = db.get(Scan, scan_id)
+    if scan is None or not secrets.compare_digest(scan.owner_token, t or ""):
+        raise HTTPException(status_code=404, detail="스캔을 찾을 수 없습니다")
+    return _markdown_document(scan, "ai_notice_md")

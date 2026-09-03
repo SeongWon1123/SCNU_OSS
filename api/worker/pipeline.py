@@ -1,10 +1,11 @@
 """Scan pipeline — SPEC §4.2:153 step order, own tx per step.
 
-Phase 2-b: preflight, clone, gitleaks, semgrep and manifest are real; scoring is
-the Phase 3 pure function (worker.scoring.compute, dynamic import per D6);
-explain/policy/upload remain simulated sleeps. The pipeline owns the §5.2
+Phase 4 (todo 16): explain/policy/upload are real. explain runs the §7 LLM
+pipeline (skipped — never failed — when the toggle is off, the key is missing or
+the budget is exceeded, 절대규칙 5); policy renders the §7.4 drafts and the §7.5
+summary; upload is the §4.2 optional S3 step. The pipeline owns the §5.2
 scan-level `rm -rf /scan/<id>` in finally.
-This file is a locked file (AGENTS.md 잠금 파일) — edited under the PROMPTS.md:96
+This file is a locked file (AGENTS.md 잠금 파일) — edited under the PROMPTS.md:120
 unlock declared in the PR body.
 """
 
@@ -14,11 +15,16 @@ from typing import Any
 
 from sqlalchemy import select
 
+from app.config import Settings
 from app.db import SessionLocal
 from app.models import Finding, Scan
 from worker import catalog as catalog_mod
 from worker import clone as clone_mod
 from worker import preflight as preflight_mod
+from worker import storage
+from worker.llm import client as llm_client
+from worker.llm import explain as llm_explain
+from worker.llm import privacy_policy as llm_policy
 from worker.preflight import PreflightResult, RejectedScan, ScanFailure
 from worker.scanners import gitleaks as gitleaks_mod
 from worker.scanners import manifest as manifest_mod
@@ -38,7 +44,6 @@ STEPS = [
 ]
 
 RATE_LIMIT_RETRY_SECONDS = 60
-SIMULATED_STEP_SECONDS = 0.3
 
 ScanId = str | int
 
@@ -155,8 +160,35 @@ def run_scan(scan_id: ScanId) -> None:
                         "grade": result["grade"],
                         "score_detail": result["detail"],
                     }
-            else:
-                time.sleep(SIMULATED_STEP_SECONDS)  # explain/policy/upload — Phase 3+
+            elif step == "explain":
+                # §7 — meta.llm.status='skipped'/'explain_off' on any LLM failure.
+                meta_patch = {"llm": llm_explain.run(scan_id, Settings())}
+            elif step == "policy":
+                # §7.4/§7.5 — render drafts (code-driven) + optional LLM fields.
+                llm_policy.run(scan_id, clone_mod.scan_path(str(scan_id)), Settings())
+            elif step == "upload":
+                try:
+                    with SessionLocal() as deliverables_session:
+                        row = deliverables_session.get(Scan, scan_id)
+                        documents = (
+                            {
+                                name: content
+                                for name, content in (
+                                    ("privacy-policy.md", row.privacy_policy_md),
+                                    ("ai-notice.md", row.ai_notice_md),
+                                )
+                                if content
+                            }
+                            if row is not None
+                            else {}
+                        )
+                    storage.upload(str(scan_id), documents)
+                except NotImplementedError:
+                    meta_patch = {"upload": "deferred_phase6"}
+                except Exception:  # noqa: BLE001 — 업로드 실패도 스캔 실패가 아니다
+                    meta_patch = {"upload": "skipped_error"}
+            elif step == "done":
+                pass  # finished inside the step transaction below
             # Own transaction per step so progress survives a mid-scan restart.
             with SessionLocal() as session:
                 scan = session.get(Scan, scan_id)
@@ -194,4 +226,5 @@ def run_scan(scan_id: ScanId) -> None:
                 session.commit()
     finally:
         # §5.2 scan-level cleanup — /scan/<id> (gitleaks report included) never outlives run_scan.
+        llm_client.drop_budget(str(scan_id))
         clone_mod.cleanup_scan_dir(str(scan_id))

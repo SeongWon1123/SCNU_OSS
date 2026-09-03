@@ -3,6 +3,7 @@
 Runnable as `python -m worker` (compose worker command).
 """
 
+import logging
 import signal
 import time
 from datetime import UTC, datetime
@@ -10,9 +11,13 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.config import Settings
 from app.db import SessionLocal
 from app.models import Scan, WorkerHeartbeat
+from worker.llm import client as llm_client
 from worker.pipeline import run_scan
+
+logger = logging.getLogger(__name__)
 
 _stopping = False
 
@@ -71,6 +76,11 @@ def _sleep_chunk(seconds: float) -> None:
 
 def main() -> None:
     signal.signal(signal.SIGTERM, _handle_sigterm)
+    try:
+        # §7.1 — worker 기동 시 models.retrieve 1회. 실패해도 기동은 막지 않는다.
+        llm_client.startup_probe(Settings())
+    except Exception as exc:  # noqa: BLE001 — 프로브 실패는 스캔 시 재확인된다
+        logger.warning("LLM 기동 확인 실패(%s) — 스캔 시 재확인", type(exc).__name__)
     with SessionLocal() as session:
         recover_interrupted(session)
         last_beat = 0.0

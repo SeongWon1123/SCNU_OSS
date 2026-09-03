@@ -14,6 +14,8 @@ dependencies = [
     "alembic",
     "pydantic-settings",
     "psycopg[binary]",
+    "openai",  # §7.1 LLM 해설·요약 — OpenAI SDK 필수(OpenRouter 경유, PR계약 ④)
+    "jinja2",  # §7.4 방침/고지 템플릿(.j2) 렌더링(PR계약 ④)
 ]
 
 [project.optional-dependencies]
@@ -27,6 +29,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["app*", "worker*"]
+
+[tool.setuptools.package-data]
+"worker" = ["templates/*.j2"]
 
 [tool.ruff]
 line-length = 100

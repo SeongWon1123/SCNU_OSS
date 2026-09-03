@@ -87,7 +87,19 @@ def test_full_pipeline_fake_positive(tmp_path, monkeypatch):
         row = session.get(Scan, scan_id)
         assert row is not None
         assert row.status == "done"
-        assert row.score is None  # scoring is the D6 stub until Phase 3
+        # Todo 14 DoD (SPEC §6): sample/positive full-pipeline scoring.
+        assert row.score is not None
+        detail = dict(row.score_detail or {})
+        regulation_penalty = 40 - detail.get("regulation", 40)
+        assert regulation_penalty == 40, f"score_detail={detail}"
+        assert row.score <= 60
+        assert row.grade in ("C", "D", "F")
+        print(
+            f"breakdown: security_penalty={40 - detail.get('security', 40)} "
+            f"regulation_penalty={regulation_penalty} "
+            f"license_penalty={20 - detail.get('license', 20)} "
+            f"score={row.score} grade={row.grade}"
+        )
         counts = dict(row.meta["counts"])
     findings = _findings(scan_id)
     present = {f.reg_rule for f in findings if f.axis == "regulation"}

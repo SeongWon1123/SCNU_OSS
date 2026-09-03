@@ -1,9 +1,9 @@
 """Scan pipeline — SPEC §4.2:153 step order, own tx per step.
 
 Phase 2-b: preflight, clone, gitleaks, semgrep and manifest are real; scoring is
-a dynamic-import stub (D6 — worker.scoring lands in Phase 3, no pipeline re-edit
-needed, the score stays null until then); explain/policy/upload remain simulated
-sleeps. The pipeline owns the §5.2 scan-level `rm -rf /scan/<id>` in finally.
+the Phase 3 pure function (worker.scoring.compute, dynamic import per D6);
+explain/policy/upload remain simulated sleeps. The pipeline owns the §5.2
+scan-level `rm -rf /scan/<id>` in finally.
 This file is a locked file (AGENTS.md 잠금 파일) — edited under the PROMPTS.md:96
 unlock declared in the PR body.
 """
@@ -59,16 +59,29 @@ def _run_preflight(owner: str, repo: str) -> PreflightResult:
         raise ScanFailure("GitHub API 한도에 도달했습니다. 잠시 후 다시 시도하세요") from exc
 
 
-def _compute_score(scan_id: ScanId) -> tuple[int, str, dict[str, int]] | None:
-    """D6 stub — importing worker.scoring (Phase 3, todo 14) auto-activates scoring;
-    until then the score stays null. Contract: compute(findings, catalog) →
-    (score, grade, detail)."""
+def _compute_score(scan_id: ScanId) -> dict[str, Any] | None:
+    """Phase 3 (todo 14) — the D6 dynamic import now resolves. Contract:
+    compute(findings, catalog) → {"score", "grade", "detail"} (SPEC §6)."""
     try:
         from worker.scoring import compute
     except ImportError:
         return None
     with SessionLocal() as session:
-        findings = list(session.scalars(select(Finding).where(Finding.scan_id == scan_id)))
+        rows = list(session.scalars(select(Finding).where(Finding.scan_id == scan_id)))
+        findings = [
+            {
+                "axis": row.axis,
+                "scope": row.scope,
+                "rule_id": row.rule_id,
+                "reg_rule": row.reg_rule,
+                "severity": row.severity,
+                "confidence": row.confidence,
+                "file_path": row.file_path,
+                "snippet": row.snippet,
+                "weight": row.weight,
+            }
+            for row in rows
+        ]
         return compute(findings, catalog_mod.load())
 
 
@@ -135,12 +148,12 @@ def run_scan(scan_id: ScanId) -> None:
                 findings = result.findings
                 axis_counts = {"regulation": sum(1 for f in findings if f["axis"] == "regulation")}
             elif step == "scoring":
-                score = _compute_score(scan_id)
-                if score is not None:
+                result = _compute_score(scan_id)
+                if result is not None:
                     row_patch = {
-                        "score": score[0],
-                        "grade": score[1],
-                        "score_detail": score[2],
+                        "score": result["score"],
+                        "grade": result["grade"],
+                        "score_detail": result["detail"],
                     }
             else:
                 time.sleep(SIMULATED_STEP_SECONDS)  # explain/policy/upload — Phase 3+

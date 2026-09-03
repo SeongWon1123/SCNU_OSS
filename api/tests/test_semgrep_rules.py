@@ -57,6 +57,7 @@ def _run_semgrep(*targets: str) -> list[dict]:
         capture_output=True,
         text=True,
         timeout=SEMGREP_TIMEOUT_SEC,
+        check=False,  # returncode 0/1 모두 성공으로 수용(61행) — 동작 불변, PLW1510 명시화
     )
     if proc.returncode not in (0, 1):
         raise AssertionError(

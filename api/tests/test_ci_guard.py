@@ -11,8 +11,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-GUARD_SCRIPT = REPO_ROOT / "scripts" / "ci_guard.py"
+# CI 체크아웃(ci.yml pytest 잡: cd api && pytest)에서는 parents[2]가 리포 루트다.
+# 로컬 docker compose(api 이미지 WORKDIR /app = api/만 베이크)에서는 리포 루트가
+# /repo:ro 마운트로만 존재하므로 두 레이아웃 모두에서 스크립트를 찾는다(판정 로직 불변).
+_GUARD_CANDIDATES = (
+    Path(__file__).resolve().parents[2] / "scripts" / "ci_guard.py",
+    Path("/repo/scripts/ci_guard.py"),
+)
+GUARD_SCRIPT = next((p for p in _GUARD_CANDIDATES if p.exists()), _GUARD_CANDIDATES[0])
 
 B_EMAIL = "b@org.example"
 OTHER_EMAIL = "stranger@example.com"

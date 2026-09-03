@@ -1,3 +1,4 @@
+# TODO(사람 게이트): org 생성 후 @<A-github-id>/@<B-github-id>를 실제 ID로 교체
 # 사람만 수정할 수 있는 파일 (에이전트 커밋은 CI 가드 + 리뷰 필수로 차단)
 rules/                              @<B-github-id>
 docs/LAW_REFERENCES.md              @<B-github-id>

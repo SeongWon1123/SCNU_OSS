@@ -1,0 +1,9 @@
+# repodoc 자기 리포용 gitleaks 설정 (SPEC.md §10 job 4 — sample/에 시크릿 없음이 전제).
+# 기본 내장 룰 전부 사용 + sample/ 픽스처·FAKE_ 접두사 문자열 허용(이중 안전).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "sample 픽스처는 시크릿 없음이 선언되어 있다 — FAKE_ 접두사 더미 값 허용"
+paths = ['''^sample/''']
+regexes = ['''FAKE_[A-Za-z0-9_\-]+''']

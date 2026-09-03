@@ -1,0 +1,55 @@
+# build.yml — main push → buildx로 api·caddy 이미지를 ECR에 push (태그 = git sha + latest).
+# SPEC.md §9.3(:291) · PROMPTS.md Phase 0-b 2번. OIDC 롤 ARN은 secrets.AWS_ROLE_ARN.
+# EC2에서 docker build 금지 — 이미지는 이 워크플로우가 유일한 공급원이다.
+name: build
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry: ${{ secrets.ECR_REGISTRY }}
+
+      - name: Build and push api image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: api/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            GITLEAKS_VERSION=8.30.1
+          tags: |
+            ${{ secrets.ECR_REGISTRY }}/repodoc-api:${{ github.sha }}
+            ${{ secrets.ECR_REGISTRY }}/repodoc-api:latest
+
+      - name: Build and push caddy image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: caddy/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ secrets.ECR_REGISTRY }}/repodoc-caddy:${{ github.sha }}
+            ${{ secrets.ECR_REGISTRY }}/repodoc-caddy:latest

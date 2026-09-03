@@ -1,4 +1,5 @@
-# 골격 (Phase 0-b에서 Codex가 완성). 7개 잡 전부 required.
+# ci.yml — 잠금 파일. 골격 (Phase 0-b에서 Codex가 완성). 생성 허용 근거: docs/PROMPTS.md:58.
+# 7개 잡 전부 required (docs/SPEC.md §10). 이후 수정은 금지 (AGENTS.md 잠금 파일).
 name: ci
 on:
   pull_request:
@@ -18,7 +19,19 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -e ./api[dev] && pip install semgrep
-      - run: curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_$(uname -s | tr A-Z a-z)_x64.tar.gz | tar xz -C /usr/local/bin gitleaks || true
+      # gitleaks: 버전 고정 자산 + 공식 checksums.txt 검증 (api/Dockerfile와 동일 핀).
+      # releases/latest/download 버전 자산명은 404, per-asset .sha256도 미공개 (task-3 evidence).
+      - run: |
+          GITLEAKS_VERSION=8.30.1
+          ASSET="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o /tmp/gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${ASSET}"
+          curl -fsSL -o /tmp/gitleaks.checksums "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          EXPECTED=$(grep " ${ASSET}\$" /tmp/gitleaks.checksums | awk '{print $1}')
+          test -n "${EXPECTED}"
+          echo "${EXPECTED}  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+          chmod 0755 /usr/local/bin/gitleaks
+          gitleaks version
       - run: cd api && pytest -q --cov=app --cov=worker --cov-fail-under=80
         env: { DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/repodoc, GITHUB_TOKEN: dummy }
   ruff:
@@ -62,6 +75,8 @@ jobs:
         with: { python-version: "3.12" }
       - run: python scripts/ci_guard.py
         env:
+          # 스크립트가 두 이름 모두 읽는다 (계획 수정 #16 — GITHUB_BASE_REF 우선, BASE_REF 폴백).
+          GITHUB_BASE_REF: ${{ github.base_ref }}
           BASE_REF: ${{ github.base_ref }}
           B_EMAIL: ${{ secrets.B_EMAIL }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}

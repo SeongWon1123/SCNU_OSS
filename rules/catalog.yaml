@@ -1,0 +1,61 @@
+# 리포닥 규제 카탈로그 v1.0 (동결) — 소유: 팀원 B. 에이전트 수정 금지.
+# 원칙: penalty 필드에 금액·형량 수치를 쓰지 않는다. 수치는 docs/LAW_REFERENCES.md에서 법제처 원문 검증 후에만 기재한다.
+R1:
+  name: 위치기반서비스사업 신고
+  agency: 방송미디어통신위원회 (신고 창구: 전자민원센터 emsit.go.kr)
+  law: 위치정보의 보호 및 이용 등에 관한 법률 제9조(신고), 제9조의2(소상공인등 특례)
+  penalty: 제40조 벌칙 대상 (형량·금액은 UI 미표시 — LAW_REFERENCES.md 원문 검증 후 기재)
+  note: 소상공인·1인창조기업은 사업 개시 후 1개월간 사전 신고가 면제되고 1개월 경과 시 신고(제9조의2, 원문 확인). 사업자가 좌표를 서버에서 획득하지 않고 단말·브라우저 안에서만 처리하면 위치기반서비스사업자에 해당하지 않을 수 있음. 비영리·개인 프로젝트는 '사업' 해당 여부 별도 확인.
+  source_url: https://www.law.go.kr/법령/위치정보의보호및이용등에관한법률
+  dependency_signals: [react-native-geolocation-service, "@react-google-maps/api", react-kakao-maps-sdk, leaflet, mapbox-gl, geopy, googlemaps]
+  outputs: [lbs_guide, location_terms_draft]
+  weight_cap: 15
+R2:
+  name: 개인정보처리방침 공개·적법 처리 근거
+  agency: 개인정보보호위원회
+  law: 개인정보보호법 제30조(처리방침), 제15조(수집·이용의 적법 근거)
+  penalty: 과태료 대상 (수치 미표시 — 원문 확인)
+  note: 동의 외에 계약 이행 등 제15조제1항 각 호의 근거로도 처리 가능. 처리방침 공개는 근거와 무관하게 필요. 작성지침(개인정보위 2025.4) 구조를 따를 것.
+  source_url: https://www.law.go.kr/법령/개인정보보호법
+  dependency_signals: [react-ga4, "@vercel/analytics", mixpanel-browser, posthog-js, "@amplitude/analytics-browser", passport, next-auth, django-allauth, firebase]
+  outputs: [privacy_policy_draft]
+  weight_cap: 15
+R3:
+  name: 통신판매업 신고
+  agency: 시·군·구청 (정부24 온라인 신고)
+  law: 전자상거래 등에서의 소비자보호에 관한 법률 제12조
+  penalty: 과태료 대상 (수치 미표시). 신고 면제 — 「통신판매업 신고 면제 기준에 관한 고시」(직전연도 거래 50회 미만 또는 간이과세자). 면제는 신고 의무만이며 청약철회·표시 의무는 그대로 적용.
+  source_url: https://www.law.go.kr/법령/전자상거래등에서의소비자보호에관한법률
+  dependency_signals: ["@tosspayments/payment-sdk", "@tosspayments/tosspayments-sdk", "@portone/browser-sdk", iamport-react-native, stripe, "@stripe/stripe-js", "@paypal/checkout-server-sdk"]
+  outputs: [ecommerce_guide]
+  weight_cap: 12
+R5:
+  name: 광고성 정보 전송 사전 동의·수신거부 안내
+  agency: 방송미디어통신위원회 / KISA 불법스팸대응센터
+  law: 정보통신망 이용촉진 및 정보보호 등에 관한 법률 제50조
+  penalty: 과태료 대상 (수치 미표시)
+  note: 거래관계 기반 안내 메일은 광고성 정보가 아닐 수 있음. 야간(21~08시) 전송 제한 별도.
+  source_url: https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률
+  dependency_signals: [nodemailer, resend, "@sendgrid/mail", "@aws-sdk/client-ses", twilio, solapi, coolsms-node-sdk]
+  outputs: [marketing_consent_template]
+  weight_cap: 6
+R6:
+  name: 생성형 AI 산출물 표시·이용자 고지
+  agency: 과학기술정보통신부
+  law: 인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 제31조 (2026.1.22 시행)
+  penalty: 제43조 과태료 대상 — 사전고지(제31조①) 미이행은 직접 과태료, 표시(②③) 미이행은 시정명령 후 불이행 시. 시행 초기 계도기간 운영(행정 운영 방침이며 법령상 유예 아님). 수치 미표시.
+  note: 외부 API(OpenAI 등)로 AI 기능을 제공하는 '인공지능이용사업자'도 대상. 이용자가 AI 사용을 쉽게 알 수 있는 형태의 표시·고지 필요.
+  source_url: https://www.law.go.kr/법령/인공지능발전과신뢰기반조성등에관한기본법
+  dependency_signals: [openai, "@anthropic-ai/sdk", anthropic, "@google/generative-ai", "@google/genai", google-generativeai, langchain, "@langchain/core", replicate]
+  outputs: [ai_notice_template]
+  weight_cap: 12
+R7:
+  name: 주민등록번호 등 고유식별정보 처리 제한
+  agency: 개인정보보호위원회
+  law: 개인정보보호법 제24조, 제24조의2
+  penalty: 과태료 및 형사처벌 가능 (수치 미표시)
+  note: 법령 근거 없는 주민등록번호 수집·저장 금지. 본인확인기관 CI/DI 등 대체수단 사용.
+  source_url: https://www.law.go.kr/법령/개인정보보호법
+  dependency_signals: []
+  outputs: [rrn_alternative_guide]
+  weight_cap: 20

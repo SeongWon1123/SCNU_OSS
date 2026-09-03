@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+.next/
+out/
+dist/
+build/
+*.log
+.DS_Store
+rules/vendor/
+rules/license-cache.json

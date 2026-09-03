@@ -1,0 +1,73 @@
+# 골격 (Phase 0-b에서 Codex가 완성). 7개 잡 전부 required.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: repodoc }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ./api[dev] && pip install semgrep
+      - run: curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_$(uname -s | tr A-Z a-z)_x64.tar.gz | tar xz -C /usr/local/bin gitleaks || true
+      - run: cd api && pytest -q --cov=app --cov=worker --cov-fail-under=80
+        env: { DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/repodoc, GITHUB_TOKEN: dummy }
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install ruff && ruff check . && ruff format --check .
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install semgrep pytest pyyaml
+      - run: semgrep --validate --config rules/kr-regulation.yaml --metrics=off
+      - run: pytest -q api/tests/test_semgrep_rules.py
+  gitleaks-self:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}", GITLEAKS_CONFIG: .gitleaks.toml }
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm, cache-dependency-path: web/package-lock.json }
+      - run: cd web && npm ci && npm run build
+      - run: cd web && npx playwright install --with-deps chromium && npx playwright test smoke
+  guard:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/ci_guard.py
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          B_EMAIL: ${{ secrets.B_EMAIL }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+  compose-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env && docker compose build api && docker compose up -d db api
+      - run: for i in $(seq 1 30); do curl -sf localhost:8000/api/health && exit 0; sleep 2; done; docker compose logs api; exit 1

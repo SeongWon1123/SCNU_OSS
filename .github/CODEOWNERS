@@ -1,0 +1,13 @@
+# 사람만 수정할 수 있는 파일 (에이전트 커밋은 CI 가드 + 리뷰 필수로 차단)
+rules/                              @<B-github-id>
+docs/LAW_REFERENCES.md              @<B-github-id>
+api/tests/test_semgrep_rules.py     @<B-github-id>
+api/app/db.py                       @<A-github-id>
+api/app/models.py                   @<A-github-id>
+api/worker/pipeline.py              @<A-github-id>
+.github/                            @<A-github-id>
+docs/PLAN.md                        @<A-github-id>
+docs/SPEC.md                        @<A-github-id>
+docs/PROMPTS.md                     @<A-github-id>
+AGENTS.md                           @<A-github-id>
+CLAUDE.md                           @<A-github-id>

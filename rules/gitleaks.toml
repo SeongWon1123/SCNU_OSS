@@ -1,0 +1,19 @@
+# 리포닥 worker가 대상 리포를 스캔할 때 항상 강제하는 gitleaks 설정 (동결)
+# 대상 리포 안의 .gitleaks.toml / .gitleaksignore 는 체크아웃 직후 삭제하고 이 파일만 사용한다.
+title = "repodoc-target-scan"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "빌드 산출물·의존성·락파일은 시크릿 오탐이 많아 제외 (점수 위조 방지를 위해 대상 리포의 설정은 무시)"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)vendor/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
+  '''(^|/)\.next/''',
+  '''\.min\.js$''',
+  '''\.map$''',
+  '''(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|Pipfile\.lock)$''',
+]

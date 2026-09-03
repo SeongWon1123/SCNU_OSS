@@ -1,0 +1,10 @@
+import { loadTossPayments } from "@tosspayments/payment-sdk";
+navigator.geolocation.getCurrentPosition((p) => send(p.coords));
+gtag('config', 'G-XXXX');
+const toss = loadTossPayments("test_ck");
+const transporter = nodemailer.createTransport({});
+transporter.sendMail({to: "a@b.c"});
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const r = await client.chat.completions.create({ model: "gpt-5" });
+const jumin_no = form.get("jumin");
+const sample = "900101-1234567";

@@ -1,9 +1,11 @@
 # repodoc 자기 리포용 gitleaks 설정 (SPEC.md §10 job 4 — sample/에 시크릿 없음이 전제).
 # 기본 내장 룰 전부 사용 + sample/ 픽스처·FAKE_ 접두사 문자열 허용(이중 안전).
+# web/node_modules·web/.next는 git 무시 대상 로컬 빌드 산출물이다(⑥: CI 체크아웃엔
+# 존재하지 않음 — 로컬 더티 트리 --no-git 스캔에서만 등장하는 오탐).
 [extend]
 useDefault = true
 
 [allowlist]
 description = "sample 픽스처는 시크릿 없음이 선언되어 있다 — FAKE_ 접두사 더미 값 허용"
-paths = ['''^sample/''']
+paths = ['''^sample/''', '''web/node_modules/''', '''web/\.next/''']
 regexes = ['''FAKE_[A-Za-z0-9_\-]+''']

@@ -1,0 +1,14 @@
+# deps & build artifacts (package-lock.json is committed)
+node_modules/
+.next/
+out/
+next-env.d.ts
+
+# playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# logs
+npm-debug.log*

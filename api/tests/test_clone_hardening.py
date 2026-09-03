@@ -37,9 +37,7 @@ def _scan_root():
 
 
 def _git(work: Path, *args: str) -> None:
-    subprocess.run(
-        ["git", "-C", str(work), *args], check=True, capture_output=True, text=True
-    )
+    subprocess.run(["git", "-C", str(work), *args], check=True, capture_output=True, text=True)
 
 
 def _bare(tmp_path: Path, name: str) -> tuple[str, Path]:
@@ -181,9 +179,7 @@ def test_6_three_thousand_file_rejection_within_5s(monkeypatch):
             return_value=httpx.Response(200, json={"sha": sha})
         )
         respx.get(f"https://api.github.com/repos/psf/requests/git/trees/{sha}").mock(
-            return_value=httpx.Response(
-                200, json={"truncated": False, "tree": tree}
-            )
+            return_value=httpx.Response(200, json={"truncated": False, "tree": tree})
         )
         scan = Scan(
             repo_url="https://github.com/psf/requests",

@@ -90,9 +90,7 @@ def badge(owner: str, repo: str) -> Response:
         ).first()
 
     if scan is None or scan.score is None or scan.grade is None:
-        svg = _render_badge(
-            BADGE_LABEL, NOT_SCANNED_TEXT, LABEL_COLOR, NOT_SCANNED_COLOR
-        )
+        svg = _render_badge(BADGE_LABEL, NOT_SCANNED_TEXT, LABEL_COLOR, NOT_SCANNED_COLOR)
     else:
         grade = str(scan.grade).strip()
         svg = _render_badge(

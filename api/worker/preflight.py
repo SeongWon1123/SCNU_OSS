@@ -101,9 +101,7 @@ def run_preflight(owner: str, repo: str) -> PreflightResult:
             raise ScanFailure("저장소를 확인할 수 없습니다")
         commit_sha = commit_resp.json()["sha"]
 
-        tree_resp = _get(
-            client, f"/repos/{owner}/{repo}/git/trees/{commit_sha}?recursive=1", token
-        )
+        tree_resp = _get(client, f"/repos/{owner}/{repo}/git/trees/{commit_sha}?recursive=1", token)
         if tree_resp.status_code != 200:
             raise ScanFailure("저장소를 확인할 수 없습니다")
         tree: list[dict[str, Any]] = tree_resp.json().get("tree", [])

@@ -45,7 +45,13 @@ def _insert_scan(
 def test_stats_counts_done_scans_distinct_repos_and_last_24h():
     u = _uid()
     _insert_scan(f"o-{u}", "alpha", consent=True, status="done", finished_at=datetime.now(UTC))
-    _insert_scan(f"o-{u}", "beta", consent=False, status="done", finished_at=datetime.now(UTC) - timedelta(days=2))
+    _insert_scan(
+        f"o-{u}",
+        "beta",
+        consent=False,
+        status="done",
+        finished_at=datetime.now(UTC) - timedelta(days=2),
+    )
     _insert_scan(f"o-{u}", "gamma", consent=True, status="queued")
 
     resp = client.get("/api/stats")

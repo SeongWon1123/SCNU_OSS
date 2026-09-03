@@ -97,7 +97,9 @@ def compute(findings: list[dict[str, Any]], catalog: dict[str, Any]) -> dict[str
     findings = apply_confidence_rules(findings)
     scored = [f for f in findings if f.get("scope") != "test"]
 
-    security_penalty = min(SECURITY_CAP, sum(f["weight"] for f in scored if f["axis"] == "security"))
+    security_penalty = min(
+        SECURITY_CAP, sum(f["weight"] for f in scored if f["axis"] == "security")
+    )
     regulation_penalty = _regulation_penalty(scored, catalog)
     license_penalty = min(LICENSE_CAP, sum(f["weight"] for f in scored if f["axis"] == "license"))
 

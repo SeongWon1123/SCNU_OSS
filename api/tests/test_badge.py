@@ -19,7 +19,9 @@ def _uid() -> str:
     return uuid.uuid4().hex[:8]
 
 
-def _insert_scan(owner: str, repo: str, *, consent: bool, finished_at: datetime | None = None) -> None:
+def _insert_scan(
+    owner: str, repo: str, *, consent: bool, finished_at: datetime | None = None
+) -> None:
     with Session(bind=deps.engine) as db:
         db.add(
             Scan(

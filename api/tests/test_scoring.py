@@ -151,9 +151,7 @@ def test_r1_confidence_high_only_when_both_signals_present():
 
 
 def test_r2_confidence_by_distinct_pii_field_types():
-    schema_email = _reg(
-        "R2", "semgrep:kr-r2-pii-schema", 10, snippet="email = Column(String)"
-    )
+    schema_email = _reg("R2", "semgrep:kr-r2-pii-schema", 10, snippet="email = Column(String)")
     schema_phone = _reg(
         "R2", "semgrep:kr-r2-pii-schema", 10, snippet="phone_number = Column(String)"
     )

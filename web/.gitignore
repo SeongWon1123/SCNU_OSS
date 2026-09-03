@@ -12,3 +12,6 @@ playwright/.cache/
 
 # logs
 npm-debug.log*
+
+# tsc incremental artifact
+tsconfig.tsbuildinfo

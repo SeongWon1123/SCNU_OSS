@@ -1,11 +1,15 @@
-"""Shared dependencies: DB engine + connectivity probe."""
+"""Shared dependencies: DB engine re-export + connectivity probe + settings provider.
 
-from sqlalchemy import create_engine, text
+`engine` is re-exported here (not defined) so test_health's
+`monkeypatch.setattr(deps, "engine", ...)` keeps patching the one global that
+check_db() reads.
+"""
+
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import Settings
-
-engine = create_engine(Settings().database_url, pool_pre_ping=True)
+from app.db import SessionLocal, engine  # noqa: F401  (re-export)
 
 
 def check_db() -> bool:
@@ -16,3 +20,7 @@ def check_db() -> bool:
     except SQLAlchemyError:
         return False
     return True
+
+
+def get_settings() -> Settings:
+    return Settings()

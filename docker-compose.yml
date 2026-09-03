@@ -42,14 +42,15 @@ services:
       dockerfile: api/Dockerfile
       args:
         - "GITLEAKS_VERSION=8.30.1"
-    # Placeholder sleep-loop; the real polling loop lands in Phase 1.
-    command: ["sh", "-c", "while true; do sleep 3600; done"]
+    # Phase 1 polling loop: claims queued scans and runs the simulated pipeline.
+    command: ["python", "-m", "worker"]
     user: "10001:10001"
     read_only: true
     # semgrep calls tempfile.gettempdir() at import; with read_only rootfs /tmp must be
     # a writable tmpfs, and HOME must point somewhere writable (~/.semgrep cache).
     environment:
       - HOME=/tmp
+      - PYTHONPATH=/app
     tmpfs:
       - /scan:size=2g,mode=1777
       - /tmp:size=256m,mode=1777

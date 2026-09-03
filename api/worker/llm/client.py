@@ -30,6 +30,7 @@ WALL_BUDGET_SECONDS = 45
 MAX_CALLS = 3
 MAX_INPUT_TOKENS = 20_000
 _TOKEN_CHARS = 3  # 근사: 한글·영문 혼합 1토큰 ≈ 3자
+REASONING_HEADROOM_TOKENS = 4000  # 추론 모델의 reasoning 소비분 — content 상한은 유지
 
 ProbeKey = tuple[str, str, str]
 
@@ -154,12 +155,22 @@ class LLMClient:
                     return None
                 budget.calls += 1
                 budget.input_tokens += prompt_tokens
+                # ⑥ OpenRouter 추론 모델 호환: reasoning 토큰이 max_tokens를 먼저
+                # 소진하면 content가 빈 채로 끝난다 — content 상한(§7.2 4k)은 그대로
+                # 두고 추론 헤드룸만 더하고, reasoning은 응답에서 제외한다.
+                # 공식 엔드포인트에는 이 파라미터를 보내지 않는다.
+                extra_body: dict | None = None
+                max_tokens = max_output_tokens
+                if self.base_url != DEFAULT_BASE_URL:
+                    extra_body = {"reasoning": {"effort": "low", "exclude": True}}
+                    max_tokens = max_output_tokens + REASONING_HEADROOM_TOKENS
                 try:
                     response = self._client.chat.completions.create(
                         model=model,
                         messages=messages,
                         response_format=fmt,
-                        max_tokens=max_output_tokens,
+                        max_tokens=max_tokens,
+                        extra_body=extra_body,
                     )
                     return json.loads(response.choices[0].message.content)
                 except BadRequestError:

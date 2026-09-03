@@ -19,6 +19,7 @@ from app.deps import get_settings
 from app.main import app
 from app.models import Scan
 from worker.pipeline import run_scan
+from worker.preflight import PreflightResult
 
 client = TestClient(app)
 
@@ -62,7 +63,17 @@ def _insert_done_scan(owner: str, repo: str, consent: bool) -> dict:
         return {"id": str(scan.id), "owner": owner, "repo": repo}
 
 
-def test_post_creates_scan_and_polls_to_done_within_10s():
+def test_post_creates_scan_and_polls_to_done_within_10s(monkeypatch):
+    # Phase 2-a made preflight/clone real (network + git); unit tests mock them
+    # (PROMPTS.md:86 — no real external calls from tests).
+    monkeypatch.setattr(
+        "worker.preflight.run_preflight",
+        lambda owner, repo: PreflightResult(
+            size_kb=1, default_branch="main", commit_sha="a" * 40, file_count=3
+        ),
+    )
+    monkeypatch.setattr("worker.clone.clone_repo", lambda url, scan_id: [])
+
     owner = f"t-{_uid()}"
     r = _post(_ip(), f"https://github.com/{owner}/repo")
     assert r.status_code == 201

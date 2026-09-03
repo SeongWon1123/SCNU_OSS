@@ -21,6 +21,9 @@ services:
       dockerfile: api/Dockerfile
       args:
         - "GITLEAKS_VERSION=8.30.1"
+    # api/worker share api/Dockerfile and differ only by command (PROMPTS.md:45);
+    # without this the base image's default CMD (python3) exits 0 and restart-loops.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
     env_file:
       - path: .env
@@ -66,9 +69,13 @@ services:
       context: .
       dockerfile: caddy/Dockerfile
     restart: unless-stopped
-    env_file:
-      - path: .env
-        required: false
+    # env_file would inject DOMAIN/ACME_EMAIL as set-but-empty strings, which makes
+    # Caddyfile site addresses substitute to "" and breaks caddy adapt. Interpolation
+    # with :- defaults guarantees non-empty values (empty .env -> placeholder hosts).
+    environment:
+      - "DOMAIN=${DOMAIN:-caddy-local.localhost}"
+      - "FALLBACK_DOMAIN=${FALLBACK_DOMAIN:-caddy-fallback.localhost}"
+      - "ACME_EMAIL=${ACME_EMAIL:-admin@caddy-local.localhost}"
     ports:
       - "80:80"
     volumes:

@@ -1,7 +1,7 @@
 # Two separate site blocks (not one combined 2-SAN block) to avoid certificate
 # coupling between the Route 53 domain and the sslip.io fallback.
 {$DOMAIN} {
-	email {$ACME_EMAIL}
+	tls {$ACME_EMAIL}
 	encode gzip
 	root * /srv/web
 	try_files {path} {path}.html {path}/
@@ -10,7 +10,7 @@
 }
 
 {$FALLBACK_DOMAIN} {
-	email {$ACME_EMAIL}
+	tls {$ACME_EMAIL}
 	encode gzip
 	root * /srv/web
 	try_files {path} {path}.html {path}/

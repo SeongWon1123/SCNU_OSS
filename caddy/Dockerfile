@@ -11,4 +11,5 @@ RUN if [ -f package.json ]; then \
     fi
 
 FROM caddy:2
+COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=web-builder /build/web/out /srv/web

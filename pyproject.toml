@@ -1,0 +1,5 @@
+# Ruff scope for CI jobs that run at the repo root (SPEC.md §10 job 2).
+# web/ and docs/ contain no Python, so they need no exclusion; sample/ fixtures
+# must not be linted/checked against themselves (ruff exclude sample/**).
+[tool.ruff]
+exclude = ["sample/**"]

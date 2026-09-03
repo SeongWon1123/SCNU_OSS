@@ -19,6 +19,8 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
+      args:
+        - "GITLEAKS_VERSION=8.30.1"
     restart: unless-stopped
     env_file:
       - path: .env
@@ -35,6 +37,8 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
+      args:
+        - "GITLEAKS_VERSION=8.30.1"
     # Placeholder sleep-loop; the real polling loop lands in Phase 1.
     command: ["sh", "-c", "while true; do sleep 3600; done"]
     user: "10001:10001"

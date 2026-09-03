@@ -45,3 +45,10 @@ RUN mkdir -p /app/rules/vendor \
 RUN useradd --uid 10001 --user-group --no-create-home --shell /usr/sbin/nologin scanner
 
 WORKDIR /app
+
+# App code + dependencies (todo 4): the image must run the API, the worker stub,
+# and the test suite (`docker compose run --rm api pytest -q`). Editable install
+# keeps /app the single source of truth for imports; dev extras bring pytest/ruff.
+COPY api/ /app/
+
+RUN pip install --no-cache-dir -e "/app[dev]"

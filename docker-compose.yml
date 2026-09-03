@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: repodoc
+    shm_size: 128m
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d repodoc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - .:/repo:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    # Placeholder sleep-loop; the real polling loop lands in Phase 1.
+    command: ["sh", "-c", "while true; do sleep 3600; done"]
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /scan:size=2g,mode=1777
+    mem_limit: 1500m
+    pids_limit: 512
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 4096
+      nproc: 256
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    build:
+      context: .
+      dockerfile: caddy/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "80:80"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:

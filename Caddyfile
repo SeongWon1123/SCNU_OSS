@@ -1,0 +1,26 @@
+# Two separate site blocks (not one combined 2-SAN block) to avoid certificate
+# coupling between the Route 53 domain and the sslip.io fallback.
+{$DOMAIN} {
+	email {$ACME_EMAIL}
+	encode gzip
+	root * /srv/web
+	try_files {path} {path}.html {path}/
+	file_server
+	reverse_proxy /api/* api:8000
+}
+
+{$FALLBACK_DOMAIN} {
+	email {$ACME_EMAIL}
+	encode gzip
+	root * /srv/web
+	try_files {path} {path}.html {path}/
+	file_server
+	reverse_proxy /api/* api:8000
+}
+
+# Local development (make up + curl localhost/api/health). No TLS, no static-export deep-link fix.
+:80 {
+	root * /srv/web
+	file_server
+	reverse_proxy /api/* api:8000
+}

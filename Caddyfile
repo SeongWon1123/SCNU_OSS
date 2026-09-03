@@ -1,5 +1,8 @@
 # Two separate site blocks (not one combined 2-SAN block) to avoid certificate
 # coupling between the Route 53 domain and the sslip.io fallback.
+
+# Staging CA (최초 발급 시 이 블록 사용 — 발급 성공 후 운영 CA로 전환):
+# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 {$DOMAIN} {
 	tls {$ACME_EMAIL}
 	encode gzip
@@ -9,6 +12,8 @@
 	reverse_proxy /api/* api:8000
 }
 
+# Staging CA (최초 발급 시 이 블록 사용 — 발급 성공 후 운영 CA로 전환):
+# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 {$FALLBACK_DOMAIN} {
 	tls {$ACME_EMAIL}
 	encode gzip

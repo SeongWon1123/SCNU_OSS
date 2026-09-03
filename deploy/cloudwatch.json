@@ -1,0 +1,43 @@
+{
+  "_comment": "CloudWatch 알람 2개 → SNS (SPEC §9.5). 적용: aws cloudwatch put-metric-alarm --cli-input-json file://deploy/cloudwatch.json (ACCOUNT_ID·INSTANCE_ID 치환 후). 디스크 알람은 amazon-cloudwatch-agent가 CWAgent 네임스페이스로 disk_used_percent를 보낸다는 전제.",
+  "region": "ap-northeast-2",
+  "sns_topic_arn": "arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:repodoc-alerts",
+  "alarms": [
+    {
+      "AlarmName": "repodoc-status-check-failed",
+      "AlarmDescription": "EC2 인스턴스 상태 검사 실패(시스템/인스턴스)",
+      "Namespace": "AWS/EC2",
+      "MetricName": "StatusCheckFailed",
+      "Dimensions": [
+        { "Name": "InstanceId", "Value": "<INSTANCE_ID>" }
+      ],
+      "Statistic": "Maximum",
+      "Period": 60,
+      "EvaluationPeriods": 2,
+      "Threshold": 1,
+      "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": ["arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:repodoc-alerts"],
+      "OKActions": ["arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:repodoc-alerts"]
+    },
+    {
+      "AlarmName": "repodoc-disk-used-over-80",
+      "AlarmDescription": "루트 디스크 사용률 80% 이상",
+      "Namespace": "CWAgent",
+      "MetricName": "disk_used_percent",
+      "Dimensions": [
+        { "Name": "InstanceId", "Value": "<INSTANCE_ID>" },
+        { "Name": "path", "Value": "/" },
+        { "Name": "fstype", "Value": "ext4" }
+      ],
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "Threshold": 80,
+      "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+      "TreatMissingData": "breaching",
+      "AlarmActions": ["arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:repodoc-alerts"],
+      "OKActions": ["arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:repodoc-alerts"]
+    }
+  ]
+}

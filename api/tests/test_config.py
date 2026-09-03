@@ -24,7 +24,11 @@ def test_settings_defines_exactly_the_14_env_keys():
     assert sorted(Settings.model_fields) == sorted(ENV_KEYS)
 
 
-def test_settings_defaults_match_env_example():
+def test_settings_defaults_match_env_example(monkeypatch):
+    # compose injects .env into the container OS env; defaults must be judged in isolation
+    for key in ENV_KEYS:
+        monkeypatch.delenv(key.upper(), raising=False)
+
     settings = Settings(_env_file=None)
 
     assert settings.database_url == "postgresql+psycopg://postgres:postgres@db:5432/repodoc"

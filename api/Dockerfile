@@ -41,6 +41,12 @@ RUN mkdir -p /app/rules/vendor \
       echo "p-ci fetch/validate failed -> kr-only fallback (SPEC.md:212)" > /app/rules/vendor/p-ci.FALLBACK; \
     fi
 
+# Frozen rule files (§5.6) + catalog: the frozen scanner commands (§5.3/§5.4) and
+# the catalog loader read them from /app/rules, and the worker container has no
+# /repo mount. The vendor/ dir created above survives — COPY of a directory merges
+# its contents into the existing target.
+COPY rules/ /app/rules/
+
 # uid 10001: the unprivileged identity the worker runs as (compose pins user 10001:10001).
 RUN useradd --uid 10001 --user-group --no-create-home --shell /usr/sbin/nologin scanner
 

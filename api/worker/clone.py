@@ -125,12 +125,23 @@ def strip_ignores(path: str) -> list[str]:
 
 
 def clone_repo(url: str, scan_id: str) -> list[str]:
-    """Full §5.2 sequence; returns meta.stripped_files. Always removes /scan/<scan_id>."""
+    """Full §5.2 sequence; returns meta.stripped_files.
+
+    The checkout is KEPT on success: the Phase 2-b scanners run on /scan/<scan_id>
+    and the pipeline's finally owns the §5.2 scan-level `rm -rf /scan/<id>`.
+    Failures (rejected/failed clone) remove it here.
+    """
     path = scan_path(scan_id)
     try:
         git_clone(url, path)
         check_ls_tree(ls_tree(path))
         checkout(path)
         return strip_ignores(path)
-    finally:
+    except BaseException:
         _remove(path)
+        raise
+
+
+def cleanup_scan_dir(scan_id: str) -> None:
+    """§5.2 scan-level finally — rm -rf /scan/<id> (gitleaks report included)."""
+    _remove(scan_path(scan_id))

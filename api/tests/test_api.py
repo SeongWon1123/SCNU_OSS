@@ -20,6 +20,7 @@ from app.main import app
 from app.models import Scan
 from worker.pipeline import run_scan
 from worker.preflight import PreflightResult
+from worker.scanners import ScannerResult
 
 client = TestClient(app)
 
@@ -73,6 +74,12 @@ def test_post_creates_scan_and_polls_to_done_within_10s(monkeypatch):
         ),
     )
     monkeypatch.setattr("worker.clone.clone_repo", lambda url, scan_id: [])
+    # Phase 2-b made the scanners real (heavy binaries); this queue test stays
+    # hermetic per PROMPTS.md:86 — real scanner results are covered by
+    # test_pipeline_fake.py against a local bare-repo fixture.
+    monkeypatch.setattr("worker.scanners.gitleaks.run", lambda scan_id: ScannerResult(findings=[]))
+    monkeypatch.setattr("worker.scanners.semgrep.run", lambda scan_id: ScannerResult(findings=[]))
+    monkeypatch.setattr("worker.scanners.manifest.run", lambda scan_id: ScannerResult(findings=[]))
 
     owner = f"t-{_uid()}"
     r = _post(_ip(), f"https://github.com/{owner}/repo")

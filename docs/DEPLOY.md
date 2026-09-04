@@ -1,7 +1,7 @@
 # DEPLOY — 배포 재현 절차 (Phase 6, 사람 게이트)
 
 > **실행은 사람이 한다.** 이 문서와 `deploy/` 스크립트는 산출물이며, 에이전트는 AWS 자원을 만들지 않는다.
-> 참조: `docs/SPEC.md` §9(289-316), `deploy/provision.sh`(§9.2), `deploy/deploy.sh`(§9.3).
+> 참조: `deploy/provision.sh`(§9.2), `deploy/deploy.sh`(§9.3).
 
 ## 굵은 금지 3종 (전 구간 적용)
 

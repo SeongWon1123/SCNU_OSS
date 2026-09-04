@@ -11,3 +11,17 @@ build/
 .DS_Store
 rules/vendor/
 rules/license-cache.json
+
+# internal planning docs & agent governance — local-only, not published
+docs/00_DECISIONS.md
+docs/04_SIMULATIONS.md
+docs/07_CHECKLIST.md
+docs/LAW_REFERENCES.md
+docs/PLAN.md
+docs/PROGRESS.md
+docs/PROMPTS.md
+docs/README_DRAFT.md
+docs/SPEC.md
+AGENTS.md
+CLAUDE.md
+.claude/

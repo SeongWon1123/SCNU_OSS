@@ -9,7 +9,7 @@ from typing import Any
 
 from worker.clone import scan_path
 from worker.preflight import ScanFailure
-from worker.scanners import ScannerResult
+from worker.scanners import ScannerResult, repo_rel_path
 
 TIMEOUT = 120
 RULES_DIR = "/app/rules"
@@ -93,7 +93,9 @@ def _build_finding(source: str, result: dict[str, Any]) -> dict[str, Any]:
     # semgrep 1.176.0 prefixes local-config ids with the config dir (e.g.
     # "rules.kr-r2-pii-hint") — the last dot segment is the stable id (SPEC §5.4:209).
     rule_id = "semgrep:" + check_id.rsplit(".", 1)[-1]
-    rel_path = str(result.get("path", ""))
+    # semgrep은 절대 타깃에 절대경로를 내놓는다 — 리포 기준 상대경로로 저장
+    # (UI 표시 + scope=test 판정이 상대경로 전제, §5.4:211).
+    rel_path = repo_rel_path(source, str(result.get("path", "")))
     start = int(result.get("start", {}).get("line", 0))
     end = int(result.get("end", {}).get("line", start))
 
@@ -143,7 +145,7 @@ def _parse(source: str, payload: dict[str, Any]) -> ScannerResult:
     for result in payload.get("results", []):
         check_id = str(result.get("check_id", ""))
         rule_id = "semgrep:" + check_id.rsplit(".", 1)[-1]
-        rel_path = str(result.get("path", ""))
+        rel_path = repo_rel_path(source, str(result.get("path", "")))
         start = int(result.get("start", {}).get("line", 0))
         key = (rule_id, rel_path, start)
         if key in seen:  # dedupe key (rule_id, path, start.line) — SPEC §5.4:209

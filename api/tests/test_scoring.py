@@ -8,7 +8,7 @@ from typing import Any
 
 from worker import catalog as catalog_mod
 from worker.scanners import gitleaks
-from worker.scoring import apply_confidence_rules, compute
+from worker.scoring import apply_confidence_rules, compute, fix_impacts
 
 CATALOG: dict[str, Any] = catalog_mod.load()
 
@@ -130,7 +130,7 @@ def test_case6_thirty_same_ruleid_gitleaks_penalty_15_one_finding():
         for i in range(30)
     ]
 
-    findings = gitleaks._parse_report(entries)
+    findings = gitleaks._parse_report("/scan/t", entries)
     result = compute(findings, CATALOG)
 
     assert len(findings) == 1  # 30 raw → 1 stored finding
@@ -175,3 +175,22 @@ def test_compute_does_not_mutate_input_findings():
     compute(findings, CATALOG)
 
     assert findings[0]["confidence"] == "medium"  # input copy untouched
+
+
+def test_fix_impacts_per_rule_gain_sorted_desc():
+    # R1 3×8=24 → cap 15, R2 1×10 → base 100-15-10=75.
+    findings = [_reg("R1", "semgrep:kr-r1-browser-geolocation", 8) for _ in range(3)] + [
+        _reg("R2", "semgrep:kr-r2-pii-schema", 10, snippet="email = Column(String)")
+    ]
+
+    impacts = fix_impacts(findings, CATALOG)
+
+    assert [(i["reg_rule"], i["points"]) for i in impacts] == [("R1", 15), ("R2", 10)]
+    assert all(i["axis"] == "regulation" for i in impacts)
+
+
+def test_fix_impacts_ignores_test_scope_and_empty():
+    assert fix_impacts([], CATALOG) == []
+    test_only = [_finding(scope="test", rule_id="gitleaks:t0")]
+
+    assert fix_impacts(test_only, CATALOG) == []  # weight 0 → gain 0 → 제외

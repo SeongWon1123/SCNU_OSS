@@ -121,6 +121,9 @@ def test_full_pipeline_fake_positive(tmp_path, monkeypatch):
         assert rule in present, f"{rule} missing from {sorted(present)}"
         print(f"{rule}: {sum(1 for f in findings if f.reg_rule == rule)}")
     assert counts["regulation"] == sum(1 for f in findings if f.axis == "regulation")
+    for f in findings:
+        assert not f.file_path.startswith("/"), f.file_path
+        assert "/scan/" not in (f.file_path or ""), f.file_path
 
 
 def test_full_pipeline_fake_negative_regulation_zero(tmp_path, monkeypatch):
@@ -207,7 +210,7 @@ def test_gitleaks_collapse_same_ruleid_and_masked_snippet():
         }
     ]
 
-    findings = gitleaks._parse_report(entries)
+    findings = gitleaks._parse_report("/scan/t123", entries)
 
     assert len(findings) == 2  # 7 same-RuleID occurrences collapse to 1 + 1 other
     aws = next(f for f in findings if f["rule_id"] == "gitleaks:aws-key")
@@ -216,6 +219,26 @@ def test_gitleaks_collapse_same_ruleid_and_masked_snippet():
     assert aws["snippet"] == "sk****"
     dumped = json.dumps(findings)
     assert "sk-secret" not in dumped and "pk-live" not in dumped  # raw secrets never stored
+
+
+def test_file_path_stored_repo_relative():
+    from worker.scanners import repo_rel_path
+
+    assert repo_rel_path("/scan/a", "/scan/a/x/y.js") == "x/y.js"
+    assert repo_rel_path("/scan/a", "x/y.js") == "x/y.js"
+    assert repo_rel_path("/scan/a", "/etc/passwd") == "passwd"
+    assert repo_rel_path("/scan/a", "") == ""
+    entries = [
+        {
+            "RuleID": "aws-key",
+            "Secret": "sk-secret-9",
+            "File": "/scan/t123/sub/a.js",
+            "StartLine": 1,
+            "EndLine": 1,
+        }
+    ]
+    findings = gitleaks._parse_report("/scan/t123", entries)
+    assert findings[0]["file_path"] == "sub/a.js"
 
 
 def test_gitleaks_report_deleted_after_run_scan(tmp_path, monkeypatch):

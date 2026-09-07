@@ -59,10 +59,12 @@ export default function RegCard({
   regRule,
   findings,
   revealed,
+  impactPoints = null,
 }: {
   regRule: string;
   findings: Finding[];
   revealed: boolean;
+  impactPoints?: number | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const info = REG_INFO[regRule];
@@ -83,6 +85,12 @@ export default function RegCard({
         </h3>
         <span className="ml-auto text-xs tabular-nums text-neutral-500">
           감점 {totalWeight} · 신호 {findings.length}건
+          {impactPoints != null && impactPoints > 0 && (
+            <span data-testid="reg-impact" className="font-semibold text-emerald-400">
+              {' '}
+              · 이것만 고치면 +{impactPoints}점
+            </span>
+          )}
         </span>
       </header>
 

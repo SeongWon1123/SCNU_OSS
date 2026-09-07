@@ -18,6 +18,8 @@ from app.db import get_db
 from app.deps import get_settings
 from app.models import Finding, RateLimitHit, Scan
 from app.schemas import RecentScan, ScanCached, ScanCreate, ScanCreated, ScanLimited
+from worker import catalog as catalog_mod
+from worker.scoring import fix_impacts
 
 router = APIRouter(prefix="/api/scans")
 
@@ -72,6 +74,11 @@ def _full_scan_response(db: Session, scan: Scan) -> dict[str, Any]:
         .scalars()
         .all()
     )
+    finding_dicts = [_finding_dict(f) for f in findings]
+    try:
+        impacts = fix_impacts(finding_dicts, catalog_mod.load())
+    except Exception:  # noqa: BLE001 — 카탈로그 읽기 실패는 처방 표시만 생략
+        impacts = []
     return {
         "id": scan.id,
         "repo_url": scan.repo_url,
@@ -92,7 +99,8 @@ def _full_scan_response(db: Session, scan: Scan) -> dict[str, Any]:
         "created_at": scan.created_at,
         "started_at": scan.started_at,
         "finished_at": scan.finished_at,
-        "findings": [_finding_dict(f) for f in findings],
+        "findings": finding_dicts,
+        "fix_impacts": impacts,
     }
 
 

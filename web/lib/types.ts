@@ -70,6 +70,14 @@ export interface ScanMeta {
   timings?: Record<string, number>;
 }
 
+/** "이것만 고치면 +N점" — GET full이 점수 산식으로 결정적 계산 (LLM 무관) */
+export interface FixImpact {
+  axis: string;
+  reg_rule: string | null;
+  points: number;
+  count: number;
+}
+
 /** GET /api/scans/{id}?t= — 토큰 일치 시 전체 응답 */
 export interface ScanFull {
   id: string;
@@ -92,6 +100,7 @@ export interface ScanFull {
   started_at: string | null;
   finished_at: string | null;
   findings: Finding[];
+  fix_impacts: FixImpact[];
 }
 
 /** 3축 잔여 예산 (§6:233 — detail = 잔여) */

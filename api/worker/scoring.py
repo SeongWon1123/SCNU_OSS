@@ -13,6 +13,8 @@ apply_confidence_rules implements §6:234-235 (display metadata; the §6 arithme
 uses weight only): R1 browser-geolocation + geo-column both present → high, one
 → medium; R2 pii-schema ≥2 distinct field types → high, 1 → medium, hint-only
 → low (weight 2). No DB, no I/O.
+
+fix_impacts reuses compute per group ("이것만 고치면 +N점", 같은 산식·cap 적용).
 """
 
 import re
@@ -91,6 +93,43 @@ def _regulation_penalty(scored: list[dict[str, Any]], catalog: dict[str, Any]) -
         cap = _weight_cap(catalog, rule)
         capped += weight if cap is None else min(cap, weight)
     return min(REGULATION_CAP, capped)
+
+
+def _group_key(finding: dict[str, Any]) -> tuple[str, str | None]:
+    """처방 그룹: 규제=R별, 보안·라이선스는 축 전체. scope는 compute가 제외한다."""
+    axis = str(finding.get("axis") or "")
+    if axis == "regulation" and finding.get("reg_rule"):
+        return (axis, str(finding.get("reg_rule")))
+    return (axis, None)
+
+
+def fix_impacts(findings: list[dict[str, Any]], catalog: dict[str, Any]) -> list[dict[str, Any]]:
+    """처방 점수 상승분(이것만 고치면 +N점) — 그룹 제거 시 점수 상승분. 결정적·LLM 무관.
+
+    같은 compute를 재사용하므로 cap·scope=test 규칙이 자동 반영된다.
+    points>0인 그룹만 points 내림차순으로 반환한다.
+    """
+    base = compute(findings, catalog)["score"]
+    groups: dict[tuple[str, str | None], list[dict[str, Any]]] = {}
+    for finding in findings:
+        groups.setdefault(_group_key(finding), []).append(finding)
+    impacts: list[dict[str, Any]] = []
+    for (axis, reg_rule), members in groups.items():
+        if not axis:
+            continue
+        rest = [f for f in findings if f not in members]
+        points = compute(rest, catalog)["score"] - base
+        if points > 0:
+            impacts.append(
+                {
+                    "axis": axis,
+                    "reg_rule": reg_rule,
+                    "points": points,
+                    "count": len(members),
+                }
+            )
+    impacts.sort(key=lambda item: (-item["points"], item["axis"], item["reg_rule"] or ""))
+    return impacts
 
 
 def compute(findings: list[dict[str, Any]], catalog: dict[str, Any]) -> dict[str, Any]:

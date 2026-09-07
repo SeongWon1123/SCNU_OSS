@@ -221,6 +221,11 @@ function ScanView() {
   const appFindings = scan.findings.filter((f) => f.scope === 'app');
   const testFindings = scan.findings.filter((f) => f.scope !== 'app');
   const regulationGroups = groupByRegRule(appFindings.filter((f) => f.axis === 'regulation'));
+  const impactByRule = new Map(
+    (scan.fix_impacts ?? [])
+      .filter((i) => i.axis === 'regulation' && i.reg_rule !== null)
+      .map((i) => [i.reg_rule as string, i.points]),
+  );
   const securityFindings = appFindings.filter((f) => f.axis === 'security');
   const licenseFindings = appFindings.filter((f) => f.axis === 'license');
   const tabCounts: Record<TabKey, number> = {
@@ -297,7 +302,13 @@ function ScanView() {
               </p>
             ) : (
               regulationGroups.map(([rule, findings]) => (
-                <RegCard key={rule} regRule={rule} findings={findings} revealed={revealed} />
+                <RegCard
+                  key={rule}
+                  regRule={rule}
+                  findings={findings}
+                  revealed={revealed}
+                  impactPoints={impactByRule.get(rule) ?? null}
+                />
               ))
             ))}
           {activeTab === 'security' && <SecurityList findings={securityFindings} revealed={revealed} />}

@@ -7,7 +7,7 @@ from typing import Any
 
 from worker.clone import scan_path
 from worker.preflight import ScanFailure
-from worker.scanners import ScannerResult
+from worker.scanners import ScannerResult, repo_rel_path
 
 TIMEOUT = 60
 RULES_CONFIG = "/app/rules/gitleaks.toml"
@@ -58,9 +58,10 @@ def _mask(secret: str) -> str:
     return secret[:2] + "****"
 
 
-def _parse_report(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _parse_report(source: str, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Report JSON → finding dicts. Same RuleID >COLLAPSE_THRESHOLD → 1 finding
-    (weight stays 15; the scoring cap handles the rest — SPEC §6)."""
+    (weight stays 15; the scoring cap handles the rest — SPEC §6).
+    File 경로는 리포 기준 상대경로로 저장한다(UI 표시용)."""
     per_rule: dict[str, list[dict[str, Any]]] = {}
     for entry in entries:
         per_rule.setdefault(str(entry.get("RuleID", "")), []).append(entry)
@@ -77,7 +78,7 @@ def _parse_report(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "reg_rule": None,
                     "severity": "critical",
                     "confidence": None,
-                    "file_path": entry.get("File"),
+                    "file_path": repo_rel_path(source, str(entry.get("File") or "")),
                     "line_start": entry.get("StartLine"),
                     "line_end": entry.get("EndLine"),
                     "snippet": _mask(str(entry.get("Secret", ""))),
@@ -106,7 +107,7 @@ def run(scan_id: str) -> ScannerResult:
 
     with open(report, encoding="utf-8") as f:
         entries = json.load(f)
-    findings = _parse_report(entries)
+    findings = _parse_report(source, entries)
     # Removed here, not only in the pipeline finally: semgrep runs next on the
     # same directory and must never see the report's raw secrets (AGENTS.md 규칙 3).
     os.remove(report)

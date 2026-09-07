@@ -206,6 +206,35 @@ def test_post_persists_consent_flag():
     assert full2["consent"] is False
 
 
+def test_get_full_includes_fix_impacts():
+    from app.models import Finding
+
+    owner = f"t-{_uid()}"
+    created = _post(_ip(), f"https://github.com/{owner}/repo").json()
+    with Session(bind=deps.engine) as session:
+        session.add(
+            Finding(
+                scan_id=uuid.UUID(created["id"]),
+                axis="regulation",
+                scope="app",
+                rule_id="semgrep:kr-r1-browser-geolocation",
+                reg_rule="R1",
+                severity="medium",
+                confidence="medium",
+                file_path="a.js",
+                line_start=1,
+                line_end=1,
+                snippet="x",
+                title_ko="t",
+                weight=8,
+            )
+        )
+        session.commit()
+    full = client.get(f"/api/scans/{created['id']}?t={created['owner_token']}").json()
+    impacts = {i["reg_rule"]: i["points"] for i in full["fix_impacts"]}
+    assert impacts.get("R1") == 8
+
+
 def test_recent_lists_only_consent_done_scans():
     shown = _insert_done_scan(f"t-{_uid()}", "open", consent=True)
     hidden = _insert_done_scan(f"t-{_uid()}", "closed", consent=False)

@@ -85,7 +85,9 @@ def enforce_limits(
 
 def run_preflight(owner: str, repo: str) -> PreflightResult:
     token = _token()
-    with httpx.Client(base_url=API_BASE, timeout=REQUEST_TIMEOUT) as client:
+    # 이전 리포는 301을 낸다 — 같은 호스트 리다이렉트를 따라가고(Authorization 유지),
+    # 최종 full_name으로 정규화한다(실측: tiangolo/fastapi·nedbat/coveragepy 이전).
+    with httpx.Client(base_url=API_BASE, timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
         resp = _get(client, f"/repos/{owner}/{repo}", token)
         if resp.status_code == 404:
             raise RejectedScan("공개 GitHub 저장소만 지원합니다")
@@ -94,6 +96,11 @@ def run_preflight(owner: str, repo: str) -> PreflightResult:
         payload = resp.json()
         if payload.get("private"):
             raise RejectedScan("공개 GitHub 저장소만 지원합니다")
+        full_name = str(payload.get("full_name") or "")
+        if "/" in full_name:
+            new_owner, _, new_repo = full_name.partition("/")
+            if new_owner and new_repo:
+                owner, repo = new_owner, new_repo
 
         branch = payload["default_branch"]
         commit_resp = _get(client, f"/repos/{owner}/{repo}/commits/{branch}", token)

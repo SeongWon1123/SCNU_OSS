@@ -241,6 +241,31 @@ def test_file_path_stored_repo_relative():
     assert findings[0]["file_path"] == "sub/a.js"
 
 
+def test_gitleaks_test_scope_weight_zero():
+    entries = [
+        {
+            "RuleID": "aws-key",
+            "Secret": "sk-secret-1",
+            "File": "/scan/t123/tests/certs/a.key",
+            "StartLine": 1,
+            "EndLine": 1,
+        },
+        {
+            "RuleID": "aws-key",
+            "Secret": "sk-secret-2",
+            "File": "/scan/t123/src/a.js",
+            "StartLine": 1,
+            "EndLine": 1,
+        },
+    ]
+    findings = gitleaks._parse_report("/scan/t123", entries)
+    by_path = {f["file_path"]: f for f in findings}
+    assert by_path["tests/certs/a.key"]["scope"] == "test"
+    assert by_path["tests/certs/a.key"]["weight"] == 0
+    assert by_path["src/a.js"]["scope"] == "app"
+    assert by_path["src/a.js"]["weight"] == 15
+
+
 def test_gitleaks_report_deleted_after_run_scan(tmp_path, monkeypatch):
     _fake_preflight(monkeypatch)
     bare = _bare_from_sample(tmp_path, "report", "positive")

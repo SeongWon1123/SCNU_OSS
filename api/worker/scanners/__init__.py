@@ -6,7 +6,9 @@ which is removed right after parsing (AGENTS.md 규칙 3 — 원문 미저장).
 """
 
 import os
+import re
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
 from typing import Any
 
 
@@ -22,6 +24,20 @@ def repo_rel_path(source: str, path: str) -> str:
     if rel == "." or rel == ".." or rel.startswith(".." + os.sep):
         return os.path.basename(path)
     return rel.replace(os.sep, "/")
+
+
+# SPEC §5.4:211 scope=test 판정(리포 상대경로 전제) — semgrep·gitleaks 공통.
+TEST_PATH_RE = re.compile(r"^(sample|samples|fixtures|__fixtures__|test|tests|__tests__|spec|e2e)/")
+TEST_FILE_PATTERNS = ("*.test.*", "*.spec.*", "*_test.*", "test_*.py")
+
+
+def is_test_scope(rel_path: str) -> bool:
+    """테스트·샘플 경로면 True (weight 0, 접힘 표시)."""
+    posix = rel_path.replace(os.sep, "/")
+    if TEST_PATH_RE.match(posix):
+        return True
+    name = os.path.basename(posix)
+    return any(fnmatch(name, pattern) for pattern in TEST_FILE_PATTERNS)
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,14 +2,12 @@
 
 import json
 import os
-import re
 import subprocess
-from fnmatch import fnmatch
 from typing import Any
 
 from worker.clone import scan_path
 from worker.preflight import ScanFailure
-from worker.scanners import ScannerResult, repo_rel_path
+from worker.scanners import ScannerResult, is_test_scope, repo_rel_path
 
 TIMEOUT = 120
 RULES_DIR = "/app/rules"
@@ -18,10 +16,6 @@ PER_RULE_LIMIT = 200
 
 FAILURE_MESSAGE = "정적 분석에 실패했습니다"
 TIMEOUT_MESSAGE = "분석 시간 초과"
-
-# §5.4:211 scope=test patterns (repo-relative paths).
-TEST_PATH_RE = re.compile(r"^(sample|samples|fixtures|__fixtures__|test|tests|__tests__|spec|e2e)/")
-TEST_FILE_PATTERNS = ("*.test.*", "*.spec.*", "*_test.*", "test_*.py")
 
 # §5.4:208 — semgrep severity → (severity label, weight).
 SEVERITY_MAP = {"ERROR": ("high", 8), "WARNING": ("medium", 3), "INFO": ("low", 1)}
@@ -73,14 +67,6 @@ def _raise_for_exit(returncode: int) -> None:
         raise ScanFailure(FAILURE_MESSAGE)
 
 
-def _is_test_scope(path: str) -> bool:
-    posix = path.replace(os.sep, "/")
-    if TEST_PATH_RE.match(posix):
-        return True
-    name = os.path.basename(posix)
-    return any(fnmatch(name, pattern) for pattern in TEST_FILE_PATTERNS)
-
-
 def _snippet(source: str, rel_path: str, start: int, end: int) -> str:
     full = os.path.join(source, rel_path)
     with open(full, encoding="utf-8", errors="replace") as f:
@@ -103,7 +89,7 @@ def _build_finding(source: str, result: dict[str, Any]) -> dict[str, Any]:
     metadata = extra.get("metadata") or {}
     reg_rule = metadata.get("rule")
     severity_raw = str(extra.get("severity", "INFO")).upper()
-    scope = "test" if _is_test_scope(rel_path) else "app"
+    scope = "test" if is_test_scope(rel_path) else "app"
 
     if reg_rule:
         axis = "regulation"

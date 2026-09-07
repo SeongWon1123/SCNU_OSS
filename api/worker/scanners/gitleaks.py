@@ -7,7 +7,7 @@ from typing import Any
 
 from worker.clone import scan_path
 from worker.preflight import ScanFailure
-from worker.scanners import ScannerResult, repo_rel_path
+from worker.scanners import ScannerResult, is_test_scope, repo_rel_path
 
 TIMEOUT = 60
 RULES_CONFIG = "/app/rules/gitleaks.toml"
@@ -70,20 +70,23 @@ def _parse_report(source: str, entries: list[dict[str, Any]]) -> list[dict[str, 
     for rule_id, group in per_rule.items():
         kept = group[:1] if len(group) > COLLAPSE_THRESHOLD else group
         for entry in kept:
+            rel_path = repo_rel_path(source, str(entry.get("File") or ""))
+            # semgrep과 동일하게 테스트·샘플 경로는 scope=test(가중치 0, 접힘 표시).
+            scope = "test" if is_test_scope(rel_path) else "app"
             findings.append(
                 {
                     "axis": "security",
-                    "scope": "app",
+                    "scope": scope,
                     "rule_id": f"gitleaks:{rule_id}",
                     "reg_rule": None,
                     "severity": "critical",
                     "confidence": None,
-                    "file_path": repo_rel_path(source, str(entry.get("File") or "")),
+                    "file_path": rel_path,
                     "line_start": entry.get("StartLine"),
                     "line_end": entry.get("EndLine"),
                     "snippet": _mask(str(entry.get("Secret", ""))),
                     "title_ko": f"시크릿이 커밋된 것으로 보입니다({rule_id})",
-                    "weight": WEIGHT,
+                    "weight": 0 if scope == "test" else WEIGHT,
                 }
             )
     return findings

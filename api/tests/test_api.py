@@ -190,6 +190,22 @@ def test_tree_and_git_suffix_normalized():
     assert full["repo_url"] == f"https://github.com/{owner}/repo"
 
 
+def test_post_persists_consent_flag():
+    owner = f"t-{_uid()}"
+    r = _post(_ip(), f"https://github.com/{owner}/repo", consent=True)
+    assert r.status_code == 201
+    created = r.json()
+    full = client.get(f"/api/scans/{created['id']}?t={created['owner_token']}").json()
+    assert full["consent"] is True
+
+    owner2 = f"t-{_uid()}"
+    r2 = _post(_ip(), f"https://github.com/{owner2}/repo")
+    assert r2.status_code == 201
+    created2 = r2.json()
+    full2 = client.get(f"/api/scans/{created2['id']}?t={created2['owner_token']}").json()
+    assert full2["consent"] is False
+
+
 def test_recent_lists_only_consent_done_scans():
     shown = _insert_done_scan(f"t-{_uid()}", "open", consent=True)
     hidden = _insert_done_scan(f"t-{_uid()}", "closed", consent=False)

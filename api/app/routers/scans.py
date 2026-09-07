@@ -162,6 +162,7 @@ def create_scan(
         owner=owner,
         repo=repo,
         owner_token=secrets.token_urlsafe(32),
+        consent=body.consent,
         meta={"explain": body.explain, "queue_position": queue_position},
     )
     db.add(scan)

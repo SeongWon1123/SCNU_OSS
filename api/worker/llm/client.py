@@ -8,6 +8,8 @@
   답할 수 있어 그것만으로 LLM을 끄지 않는다. list까지 실패하면 비활성.
 - 스캔당 예산: 벽시계 45초 · 호출 최대 3회 · 입력 합 20k 토큰(근사). 초과·429·
   파싱 실패 시 호출은 None을 돌려주고 상위 단계가 status='skipped'로 마친다.
+  벽시계는 호출 *전* 검사뿐 아니라 진행 중 호출에도 강제한다 — SDK 타임아웃이
+  특정 공급자 경로에서 실효가 없으면(실측 227초) 여기 데드라인 스레드가 자른다.
 """
 
 import hashlib
@@ -15,7 +17,9 @@ import json
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 
 from openai import BadRequestError, OpenAI
 
@@ -165,17 +169,61 @@ class LLMClient:
                     extra_body = {"reasoning": {"effort": "low", "exclude": True}}
                     max_tokens = max_output_tokens + REASONING_HEADROOM_TOKENS
                 try:
-                    response = self._client.chat.completions.create(
-                        model=model,
-                        messages=messages,
-                        response_format=fmt,
-                        max_tokens=max_tokens,
-                        extra_body=extra_body,
+                    # 벽시계 강제: 남은 예산을 스레드 타임아웃으로 건다.
+                    # with 블록은 종료 시 스레드 완료까지 대기하므로 사용 금지.
+                    call_started = time.monotonic()
+                    remaining = budget.deadline - call_started
+                    if remaining <= 0:
+                        return None
+                    pool = ThreadPoolExecutor(max_workers=1)
+                    try:
+                        future = pool.submit(
+                            partial(
+                                self._client.chat.completions.create,
+                                model=model,
+                                messages=messages,
+                                response_format=fmt,
+                                max_tokens=max_tokens,
+                                extra_body=extra_body,
+                            )
+                        )
+                    except Exception as exc:  # noqa: BLE001 — 스레드 기동 실패 방어선
+                        logger.warning(
+                            "LLM 호출 준비 실패(%s) — 스캔은 skipped로 계속", type(exc).__name__
+                        )
+                        pool.shutdown(wait=False)
+                        return None
+                    try:
+                        response = future.result(timeout=remaining)
+                    except TimeoutError:
+                        logger.warning(
+                            "LLM 호출이 남은 예산(%.1fs)을 초과 — skipped로 계속",
+                            remaining,
+                        )
+                        pool.shutdown(wait=False, cancel_futures=True)
+                        return None
+                    except BadRequestError:
+                        pool.shutdown(wait=True)
+                        continue  # json_schema 미지원 → json_object → fallback 모델
+                    except Exception as exc:  # noqa: BLE001 — 429·네트워크 모두 폴백 대상
+                        logger.warning(
+                            "LLM 호출 실패(%s) — 스캔은 skipped로 계속", type(exc).__name__
+                        )
+                        pool.shutdown(wait=True)
+                        return None
+                    pool.shutdown(wait=True)
+                    elapsed = time.monotonic() - call_started
+                    logger.info("LLM 호출 완료(model=%s, %.1fs)", model, elapsed)
+                    try:
+                        return json.loads(response.choices[0].message.content)
+                    except Exception as exc:  # noqa: BLE001 — 파싱 실패도 폴백 대상
+                        logger.warning(
+                            "LLM 응답 파싱 실패(%s) — 스캔은 skipped로 계속", type(exc).__name__
+                        )
+                        return None
+                except Exception as exc:  # noqa: BLE001 — 최후 방어선(스캔은 계속)
+                    logger.warning(
+                        "LLM 호출 경로 실패(%s) — 스캔은 skipped로 계속", type(exc).__name__
                     )
-                    return json.loads(response.choices[0].message.content)
-                except BadRequestError:
-                    continue  # json_schema 미지원 → json_object → fallback 모델
-                except Exception as exc:  # noqa: BLE001 — 429·네트워크·파싱 모두 폴백 대상
-                    logger.warning("LLM 호출 실패(%s) — 스캔은 skipped로 계속", type(exc).__name__)
                     return None
         return None

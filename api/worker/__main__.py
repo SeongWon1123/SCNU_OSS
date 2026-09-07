@@ -6,6 +6,7 @@ Runnable as `python -m worker` (compose worker command).
 import logging
 import signal
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
 from sqlalchemy import select, update
@@ -20,6 +21,10 @@ from worker.pipeline import run_scan
 logger = logging.getLogger(__name__)
 
 _stopping = False
+
+# SPEC §4.3: 총 300초 초과 → failed "전체 시간 초과".
+# pipeline.py(잠금 파일)를 수정하지 않고 __main__ 래퍼에서 강제한다.
+TOTAL_SCAN_TIMEOUT_SECONDS = 300.0
 
 
 def _handle_sigterm(signum: int, frame: object) -> None:
@@ -93,8 +98,24 @@ def main() -> None:
             if scan_id is None:
                 _sleep_chunk(2.0)
                 continue
+            pool = ThreadPoolExecutor(max_workers=1)
             try:
-                run_scan(scan_id)
+                future = pool.submit(run_scan, scan_id)
+                try:
+                    future.result(timeout=TOTAL_SCAN_TIMEOUT_SECONDS)
+                except TimeoutError:
+                    session.rollback()
+                    with session.begin():
+                        session.execute(
+                            update(Scan)
+                            .where(Scan.id == scan_id)
+                            .values(status="failed", error="전체 시간 초과")
+                        )
+                    # 타임아웃된 스레드는 백그라운드에서 정리되도록 분리한다.
+                    # (with 블록 사용 시 __exit__에서 완료까지 대기하므로 사용 금지)
+                    pool.shutdown(wait=False, cancel_futures=True)
+                    continue
+                pool.shutdown(wait=True)
             except Exception as exc:  # noqa: BLE001 — record and keep polling
                 session.rollback()
                 with session.begin():

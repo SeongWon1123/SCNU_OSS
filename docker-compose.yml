@@ -46,6 +46,9 @@ services:
     command: ["python", "-m", "worker"]
     user: "10001:10001"
     read_only: true
+    env_file:
+      - path: .env
+        required: false
     # semgrep calls tempfile.gettempdir() at import; with read_only rootfs /tmp must be
     # a writable tmpfs, and HOME must point somewhere writable (~/.semgrep cache).
     environment:
@@ -84,6 +87,7 @@ services:
       - "ACME_EMAIL=${ACME_EMAIL:-admin@caddy-local.localhost}"
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - caddy_data:/data
       - caddy_config:/config

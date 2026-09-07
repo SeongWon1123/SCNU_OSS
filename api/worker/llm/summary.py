@@ -51,7 +51,7 @@ def fallback_text(findings: list[dict[str, Any]], score: int | None, grade: str 
             f"발견된 보안·규제 항목이 없습니다. 진단 점수는 {score or 0}점"
             f"({grade or '-'}등급)입니다. 노출된 시크릿도 없습니다."
         )
-    secret_count = sum(1 for f in findings if f.get("axis") == "secrets")
+    secret_count = sum(1 for f in findings if f.get("rule_id", "").startswith("gitleaks:"))
     duty = _top_duty(findings)
     sentences = [f"진단 점수는 {score or 0}점({grade or '-'}등급)입니다."]
     sentences.append(
@@ -80,7 +80,9 @@ def run(
             "score": score,
             "grade": grade,
             "top_duty": _top_duty(findings),
-            "secret_count": sum(1 for f in findings if f.get("axis") == "secrets"),
+            "secret_count": sum(
+                1 for f in findings if f.get("rule_id", "").startswith("gitleaks:")
+            ),
         }
         data = llm.chat_json(
             budget,

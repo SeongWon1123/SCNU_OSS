@@ -1,4 +1,5 @@
-"""Application settings — the 14-key contract of .env.example (docs/PROMPTS.md:50)."""
+"""Application settings — the 14-key contract of .env.example (docs/PROMPTS.md:50)
+plus the service-wide caps MAX_QUEUED_SCANS / GLOBAL_DAILY_SCAN_LIMIT."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,6 +17,8 @@ class Settings(BaseSettings):
     max_total_mb: int = 300
     daily_limit_per_ip: int = 100
     rate_limit_bypass_ips: str = ""
+    max_queued_scans: int = 20
+    global_daily_scan_limit: int = 1000
     domain: str = ""
     fallback_domain: str = ""
     acme_email: str = ""

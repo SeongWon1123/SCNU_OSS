@@ -1,6 +1,38 @@
 # Two separate site blocks (not one combined 2-SAN block) to avoid certificate
 # coupling between the Route 53 domain and the sslip.io fallback.
 
+# Real visitor IP: requests arrive via cloudflared/docker (172.16.0.0/12), and the
+# Cloudflare edge sets CF-Connecting-IP (client-supplied values are rejected at the edge).
+{
+	servers {
+		trusted_proxies static 172.16.0.0/12
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+# Shared by all site blocks: security headers, API body limit, API proxy.
+# The API reads the FIRST X-Forwarded-For value, so it is replaced (not appended) with {client_ip}.
+(hardening) {
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+	request_body /api/* {
+		max_size 64KB
+	}
+	reverse_proxy /api/* api:8000 {
+		header_up X-Forwarded-For {client_ip}
+	}
+	# Error responses (e.g. 413) bypass the header handler above; strip Server there too.
+	handle_errors {
+		header -Server
+	}
+}
+
 # Staging CA (최초 발급 시 이 블록 사용 — 발급 성공 후 운영 CA로 전환):
 # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 {$DOMAIN} {
@@ -9,7 +41,7 @@
 	root * /srv/web
 	try_files {path} {path}.html {path}/
 	file_server
-	reverse_proxy /api/* api:8000
+	import hardening
 }
 
 # Staging CA (최초 발급 시 이 블록 사용 — 발급 성공 후 운영 CA로 전환):
@@ -20,7 +52,7 @@
 	root * /srv/web
 	try_files {path} {path}.html {path}/
 	file_server
-	reverse_proxy /api/* api:8000
+	import hardening
 }
 
 # Local development (make up + curl localhost/api/health). No TLS, no static-export deep-link fix.
@@ -28,5 +60,5 @@
 	root * /srv/web
 	try_files {path} {path}.html {path}/
 	file_server
-	reverse_proxy /api/* api:8000
+	import hardening
 }

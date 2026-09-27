@@ -10,6 +10,10 @@ services:
 
   # The tunnel reaches caddy over the compose network, so in tunnel mode caddy
   # needs no public listener: bind 80 to loopback only and drop 443.
+  # CF-Connecting-IP is honoured only from these ranges (Caddyfile default trusts nobody);
+  # cloudflared reaches caddy from the compose network inside 172.16.0.0/12.
   caddy:
+    environment:
+      - "TRUSTED_PROXY_RANGES=172.16.0.0/12"
     ports: !override
       - "127.0.0.1:80:80"

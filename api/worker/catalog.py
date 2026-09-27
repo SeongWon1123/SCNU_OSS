@@ -8,12 +8,13 @@ without touching the file itself (declared in PR 계약 ⑥).
 """
 
 import re
-from pathlib import Path
 from typing import Any
 
 from ruamel.yaml import YAML
 
-CATALOG_PATH = Path("/app/rules/catalog.yaml")
+from worker.paths import rules_dir
+
+CATALOG_PATH = rules_dir() / "catalog.yaml"
 
 _MAPPING_LINE = re.compile(r"^(\s*[\w.-]+: )(.+)$")
 

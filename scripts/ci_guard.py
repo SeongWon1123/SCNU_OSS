@@ -42,6 +42,17 @@ def resolve_base(env: dict[str, str]) -> str:
     return base
 
 
+def resolve_ref(base: str, cwd: str) -> str:
+    """base가 로컬 ref로 없으면 origin/<base>로 폴백 (CI 체크아웃은 origin/<base>만 가진다)."""
+    for ref in (base, f"origin/{base}"):
+        try:
+            _git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], cwd)
+        except RuntimeError:
+            continue
+        return ref
+    raise RuntimeError(f"base ref '{base}'도 'origin/{base}'도 찾을 수 없다.")
+
+
 def diff_numstat(base: str, cwd: str) -> list[tuple[int, int, str]]:
     """PR diff를 (added, deleted, path) 행으로 반환. base...HEAD 실패 시 base 폴백."""
     try:
@@ -123,7 +134,7 @@ def main() -> int:
     env = os.environ
     cwd = os.getcwd()
     try:
-        base = resolve_base(env)
+        base = resolve_ref(resolve_base(env), cwd)
         rows = diff_numstat(base, cwd)
         authors = commit_author_emails(base, cwd)
     except RuntimeError as exc:

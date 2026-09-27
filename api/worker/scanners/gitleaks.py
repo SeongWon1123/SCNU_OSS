@@ -6,11 +6,12 @@ import subprocess
 from typing import Any
 
 from worker.clone import scan_path
+from worker.paths import rules_dir
 from worker.preflight import ScanFailure
 from worker.scanners import ScannerResult, is_test_scope, repo_rel_path
 
 TIMEOUT = 60
-RULES_CONFIG = "/app/rules/gitleaks.toml"
+RULES_CONFIG = str(rules_dir() / "gitleaks.toml")
 REPORT_NAME = "gitleaks-report.json"
 COLLAPSE_THRESHOLD = 5  # same RuleID >5 occurrences → collapse to 1 finding
 WEIGHT = 15

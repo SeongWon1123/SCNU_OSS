@@ -1,7 +1,7 @@
 """scripts/ci_guard.py 단위 테스트 — /tmp synthetic git 리포로 diff 시나리오를 구성한다.
 
 guard 잡은 PR base diff가 필요하므로 로컬 재현 대상이 아니고(계획 M16),
-이 유닛 4케이스가 가드 판정 로직의 로컬 커버리지다. B_EMAIL은 환경변수로 주입한다(A5).
+이 유닛 케이스들이 가드 판정 로직의 로컬 커버리지다. B_EMAIL은 환경변수로 주입한다(A5).
 """
 
 from __future__ import annotations
@@ -44,8 +44,10 @@ def _init_repo(tmp_path: Path) -> Path:
     return repo
 
 
-def _run_guard(repo: Path, *, labels: str = "") -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "GITHUB_BASE_REF": "base", "B_EMAIL": B_EMAIL, "PR_LABELS": labels}
+def _run_guard(
+    repo: Path, *, labels: str = "", base: str = "base"
+) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, "GITHUB_BASE_REF": base, "B_EMAIL": B_EMAIL, "PR_LABELS": labels}
     env.pop("BASE_REF", None)
     return subprocess.run(
         [sys.executable, str(GUARD_SCRIPT)],
@@ -124,3 +126,30 @@ def test_pipeline_change_with_unlock_label_passes(tmp_path: Path) -> None:
     # Then: 통과
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "[guard] 통과" in proc.stdout
+
+
+def test_base_only_on_origin_falls_back_to_remote_ref(tmp_path: Path) -> None:
+    # Given: CI 체크아웃처럼 로컬 base 브랜치 없이 origin/base만 있고, 그 위에 401줄 PR
+    repo = _init_repo(tmp_path)
+    _git(repo, "update-ref", "refs/remotes/origin/base", "HEAD")
+    (repo / "generated.txt").write_text(
+        "\n".join(f"line {i}" for i in range(401)) + "\n", encoding="utf-8"
+    )
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "big")
+    # When: 가드 실행 (GITHUB_BASE_REF=base)
+    proc = _run_guard(repo)
+    # Then: 실행 오류가 아니라 origin/base 기준 diff로 크기 판정
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert "실행 오류" not in proc.stderr, proc.stderr
+    assert "401줄" in proc.stdout, proc.stdout
+
+
+def test_unknown_base_ref_fails_with_clear_message(tmp_path: Path) -> None:
+    # Given: 로컬에도 origin에도 없는 base 이름
+    repo = _init_repo(tmp_path)
+    # When: 가드 실행
+    proc = _run_guard(repo, base="nope")
+    # Then: 어떤 ref를 찾았는지 알려주며 실패
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert "origin/nope" in proc.stderr, proc.stderr

@@ -7,3 +7,9 @@ services:
     restart: unless-stopped
     depends_on:
       - caddy
+
+  # The tunnel reaches caddy over the compose network, so in tunnel mode caddy
+  # needs no public listener: bind 80 to loopback only and drop 443.
+  caddy:
+    ports: !override
+      - "127.0.0.1:80:80"

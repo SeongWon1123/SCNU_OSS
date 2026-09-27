@@ -110,7 +110,7 @@ export interface AxisDetail {
   license?: number;
 }
 
-/** GET /api/scans/{id}?t= — 불일치/없음 시 축약 응답 (running이면 findings가 붙을 수 있음) */
+/** GET /api/scans/{id}?t= — 불일치/없음 시 축약 응답 (findings 없음; 공개 동의 안 한 스캔은 score/grade/score_detail이 null) */
 export interface ScanLimited {
   id: string;
   status: ScanStatus;

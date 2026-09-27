@@ -26,16 +26,23 @@ router = APIRouter(prefix="/api/scans")
 DbSession = Annotated[Session, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 
-_REPO_RE = re.compile(r"^https://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/.*)?$")
+_REPO_RE = re.compile(
+    r"https://github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/([A-Za-z0-9._-]{1,100}?)"
+    r"(?:\.git)?(?:/tree/\S+)?"
+)
 
 
 def normalize_repo_url(raw: str) -> tuple[str, str, str] | None:
     """`https://github.com/{o}/{r}`만 — `.git`·`/tree/x`·슬래시 제거, 아니면 None."""
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in raw):
+        return None
     cleaned = raw.rstrip("/")
-    m = _REPO_RE.match(cleaned)
+    m = _REPO_RE.fullmatch(cleaned)
     if m is None:
         return None
     owner, repo = m.group(1), m.group(2)
+    if repo in (".", ".."):
+        return None
     return f"https://github.com/{owner}/{repo}", owner, repo
 
 
@@ -125,6 +132,7 @@ def create_scan(
                     Scan.owner == owner,
                     Scan.repo == repo,
                     Scan.status == "done",
+                    Scan.consent.is_(True),
                     Scan.finished_at >= datetime.now(UTC) - timedelta(hours=24),
                 )
                 .order_by(Scan.finished_at.desc())
@@ -141,6 +149,25 @@ def create_scan(
             )
             # 200 (not 201): no new scan, no owner_token, no rate-limit count.
             return JSONResponse(status_code=200, content=jsonable_encoder(cached_resp))
+
+    # Service-wide caps: checked before the per-IP counter so a rejected request costs nothing.
+    queue_position = (
+        db.scalar(select(func.count()).select_from(Scan).where(Scan.status == "queued")) or 0
+    )
+    if queue_position >= settings.max_queued_scans:
+        raise HTTPException(
+            status_code=503,
+            detail="지금 대기 중인 검사가 많습니다 — 잠시 후 다시 시도하세요",
+        )
+    day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    created_today = (
+        db.scalar(select(func.count()).select_from(Scan).where(Scan.created_at >= day_start)) or 0
+    )
+    if created_today >= settings.global_daily_scan_limit:
+        raise HTTPException(
+            status_code=429,
+            detail="오늘 서비스 전체 검사 한도에 도달했습니다 — 내일 다시 시도하세요",
+        )
 
     # Per-IP daily limit on X-Forwarded-For first value (bypass list from settings).
     ip = client_ip(request)
@@ -162,9 +189,6 @@ def create_scan(
         else:
             hit.hits += 1
 
-    queue_position = (
-        db.scalar(select(func.count()).select_from(Scan).where(Scan.status == "queued")) or 0
-    )
     scan = Scan(
         repo_url=canonical_url,
         owner=owner,
@@ -200,47 +224,50 @@ def get_scan(scan_id: UUID, db: DbSession, t: str = "") -> Any:
     if scan is None:
         raise HTTPException(status_code=404, detail="스캔을 찾을 수 없습니다")
 
-    if secrets.compare_digest(scan.owner_token, t or ""):
+    if secrets.compare_digest(scan.owner_token.encode(), (t or "").encode()):
         return _full_scan_response(db, scan)
 
+    # Token-less: score only for scans the owner agreed to share (consent).
+    public = scan.consent
     limited = ScanLimited(
         id=scan.id,
         status=scan.status,
-        score=scan.score,
-        grade=scan.grade,
-        score_detail=scan.score_detail,
+        score=scan.score if public else None,
+        grade=scan.grade if public else None,
+        score_detail=scan.score_detail if public else None,
         progress=scan.meta.get("progress"),
         message="상세는 스캔 생성자만 볼 수 있습니다",
     )
-    if scan.status == "running":
-        partial = db.execute(select(Finding).where(Finding.scan_id == scan.id)).scalars().all()
-        if partial:
-            resp = limited.model_dump()
-            resp["findings"] = [_finding_dict(f) for f in partial]
-            return resp
     return limited.model_dump()
 
 
-def _markdown_document(scan: Scan, column: str) -> Response:
-    """SPEC:146-147 — token-gated text/markdown; 문서가 없으면 404."""
+def _markdown_document(scan: Scan, column: str, filename: str) -> Response:
+    """SPEC:146-147 — token-gated text/markdown download; 문서가 없으면 404."""
     document = getattr(scan, column)
     if document is None:
         raise HTTPException(status_code=404, detail="문서가 아직 생성되지 않았습니다")
-    return Response(content=document, media_type="text/markdown; charset=utf-8")
+    return Response(
+        content=document,
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
 
 
 @router.get("/{scan_id}/privacy-policy.md")
 def get_privacy_policy_md(scan_id: UUID, db: DbSession, t: str = "") -> Response:
     scan = db.get(Scan, scan_id)
-    if scan is None or not secrets.compare_digest(scan.owner_token, t or ""):
+    if scan is None or not secrets.compare_digest(scan.owner_token.encode(), (t or "").encode()):
         raise HTTPException(status_code=404, detail="스캔을 찾을 수 없습니다")
-    return _markdown_document(scan, "privacy_policy_md")
+    return _markdown_document(scan, "privacy_policy_md", "privacy-policy.md")
 
 
 @router.get("/{scan_id}/ai-notice.md")
 def get_ai_notice_md(scan_id: UUID, db: DbSession, t: str = "") -> Response:
     """R6 산출물만 존재(SPEC:147) — AI 고지가 없는 스캔은 404."""
     scan = db.get(Scan, scan_id)
-    if scan is None or not secrets.compare_digest(scan.owner_token, t or ""):
+    if scan is None or not secrets.compare_digest(scan.owner_token.encode(), (t or "").encode()):
         raise HTTPException(status_code=404, detail="스캔을 찾을 수 없습니다")
-    return _markdown_document(scan, "ai_notice_md")
+    return _markdown_document(scan, "ai_notice_md", "ai-notice.md")

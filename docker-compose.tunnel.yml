@@ -1,0 +1,9 @@
+# Temporary public link (Cloudflare Quick Tunnel) — no account, domain, or open port.
+# Usage: make tunnel-up && make tunnel-url. The URL changes whenever the tunnel restarts.
+services:
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: ["tunnel", "--no-autoupdate", "--url", "http://caddy:80"]
+    restart: unless-stopped
+    depends_on:
+      - caddy

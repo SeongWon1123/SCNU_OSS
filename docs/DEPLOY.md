@@ -9,6 +9,20 @@
 2. **EIP 재할당 금지** — Route 53 A 레코드와 `FALLBACK_DOMAIN`이 고정된다. 재할당 시 도메인·인증서 재작업.
 3. **9/23 이후 stop 금지** — 전시 기간 중 인스턴스 정지(재부팅만 허용). stop하면 public IPv4 과금 정책과 세션이 어긋난다(§9.4).
 
+## 0-a. 임시 공개 (Cloudflare Quick Tunnel — 중간 시연용)
+
+이 PC에서 스택을 띄우고 공개 URL만 빌려 쓴다. AWS·도메인·열린 포트 불필요.
+
+```bash
+make tunnel-up     # 기존 compose + docker-compose.tunnel.yml(cloudflared → caddy:80)
+make tunnel-url    # https://<랜덤>.trycloudflare.com
+make tunnel-stop   # 공개 중단(스택은 유지)
+```
+
+- URL은 터널을 재시작할 때마다 바뀌고, PC가 꺼지거나 절전하면 링크도 끊긴다(공개 기간엔 절전 끄기).
+- 모든 방문자가 터널 IP 하나로 집계되어 일일 한도(`DAILY_LIMIT_PER_IP`)를 함께 쓴다.
+- 상시 운영은 아래 EC2 절차로 옮긴다.
+
 ## 0. 사전 준비
 
 - AWS 계정 + 크레딧(예산 $20 — §9.5), 로컬에 AWS CLI 자격증명(`aws sts get-caller-identity` 확인).

@@ -76,9 +76,17 @@ set -eux
 systemctl stop unattended-upgrades || true
 apt-get -o DPkg::Lock::Timeout=600 update
 DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y \
-  docker.io docker-compose-v2 awscli amazon-cloudwatch-agent curl
-# amazon-ssm-agent는 Ubuntu 표준 저장소에 없다(24.04) — snap 설치.
-snap install amazon-ssm-agent --classic || apt-get -o DPkg::Lock::Timeout=600 install -y amazon-ssm-agent
+  docker.io docker-compose-plugin awscli curl
+# CloudWatch 에이전트는 Ubuntu 저장소 패키지가 아니라 공식 .deb로 설치한다.
+curl -fsSL -o /tmp/cwagent.deb \
+  https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+dpkg -i /tmp/cwagent.deb || apt-get -o DPkg::Lock::Timeout=600 install -yf
+# amazon-ssm-agent는 Ubuntu AMI에 보통 선탑재. 없을 때만 snap으로 설치한다.
+# (22 포트 없음 — 에이전트 없으면 접속 불가라 여기서 실패하는 게 맞다.)
+snap wait system seed.loaded 2>/dev/null || true
+if ! systemctl cat amazon-ssm-agent.service >/dev/null 2>&1; then
+  snap install amazon-ssm-agent --classic
+fi
 systemctl enable --now docker amazon-ssm-agent amazon-cloudwatch-agent
 usermod -aG docker ubuntu
 fallocate -l 2G /swapfile

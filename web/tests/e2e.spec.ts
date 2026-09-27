@@ -64,6 +64,7 @@ test('결과 화면 — fixture a(60/C): 탭·토글 OFF 시 해설 숨김 + 점
   await expect(regCard).toContainText('방송미디어통신위원회');
   await expect(regCard).toContainText('법제처 원문 보기');
   await expect(page.getByTestId('confidence-badge').first()).toBeVisible();
+  await expect(page.getByTestId('reg-impact')).toContainText('+8점');
   const explain = regCard.getByText('브라우저 위치 API를 서버와 연동하면');
   await expect(explain).toBeVisible();
 

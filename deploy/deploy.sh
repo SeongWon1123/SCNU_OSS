@@ -23,6 +23,20 @@ SCP_E="scp -P $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/n
 [ -n "$SSH_KEY" ] && SCP_E="$SCP_E -i $SSH_KEY"
 TARGET="ubuntu@localhost"
 
+echo "[0/5] 전제 확인 — 침묵 실패 방지: GITHUB_TOKEN·DOMAIN·ACME_EMAIL 중 하나라도 비면 중단한다."
+need_nonempty() { # $1=VAR — 환경변수 우선, 없으면 로컬 .env에서 읽는다.
+  if [ -n "${!1:-}" ]; then return 0; fi
+  local val
+  val=$(grep -E "^$1=" "$REPO_DIR/.env" 2>/dev/null | tail -1 | cut -d= -f2- || true)
+  [ -n "${val:-}" ]
+}
+for key in GITHUB_TOKEN DOMAIN ACME_EMAIL; do
+  if ! need_nonempty "$key"; then
+    echo "[0/5] 실패: $key 가 비어 있다 — .env에 실제 값을 넣고 다시 실행할 것." >&2
+    exit 1
+  fi
+done
+
 echo "[0/5] 터널 확인 — 위 start-session 명령이 떠 있어야 한다."
 $SSH_E "$TARGET" true
 
@@ -48,13 +62,21 @@ aws ecr get-login-password --region "$REGION" | \
 # .env로 생성한다. 호스트 awscli + 인스턴스 롤(ssm:GetParameter /repodoc/*) 사용.
 KEY=$(aws ssm get-parameter --name /repodoc/OPENAI_API_KEY --with-decryption \
   --query Parameter.Value --output text)
+: "${KEY:?SSM /repodoc/OPENAI_API_KEY 읽기 실패 — ssm-put.sh를 먼저 실행할 것}"
 BASE=$(aws ssm get-parameter --name /repodoc/OPENAI_BASE_URL --with-decryption \
   --query Parameter.Value --output text 2>/dev/null || true)
 MODEL=$(aws ssm get-parameter --name /repodoc/OPENAI_MODEL --with-decryption \
   --query Parameter.Value --output text 2>/dev/null || true)
+FALLBACK=$(aws ssm get-parameter --name /repodoc/OPENAI_MODEL_FALLBACK --with-decryption \
+  --query Parameter.Value --output text 2>/dev/null || true)
 touch .env
-sed -i '/^OPENAI_API_KEY=/d;/^OPENAI_BASE_URL=/d;/^OPENAI_MODEL=/d' .env
-printf 'OPENAI_API_KEY=%s\nOPENAI_BASE_URL=%s\nOPENAI_MODEL=%s\n' "$KEY" "$BASE" "$MODEL" >> .env
+sed -i '/^OPENAI_API_KEY=/d;/^OPENAI_BASE_URL=/d;/^OPENAI_MODEL=/d;/^OPENAI_MODEL_FALLBACK=/d' .env
+printf 'OPENAI_API_KEY=%s\n' "$KEY" >> .env
+# 빈 값은 기록하지 않는다 — 빈 문자열이 코드 기본값을 덮어 LLM이 꺼지는 것을 방지.
+for pair in "OPENAI_BASE_URL:$BASE" "OPENAI_MODEL:$MODEL" "OPENAI_MODEL_FALLBACK:$FALLBACK"; do
+  k="${pair%%:*}"; v="${pair#*:}"
+  if [ -n "$v" ] && [ "$v" != "None" ]; then printf '%s=%s\n' "$k" "$v" >> .env; fi
+done
 chmod 600 .env
 
 # compose는 로컬 개발용 build:만 있어 EC2 pull을 위해 image: 오버라이드가 필요하다(⑥).

@@ -8,6 +8,7 @@ import signal
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -79,6 +80,39 @@ def _sleep_chunk(seconds: float) -> None:
         time.sleep(0.1)
 
 
+def _run_scan_guarded(
+    session: Session,
+    scan_id: UUID,
+    run_fn=run_scan,
+    timeout: float = TOTAL_SCAN_TIMEOUT_SECONDS,
+) -> None:
+    """§4.3 총 300초 가드 — 신뢰성 테스트를 위해 루프에서 분리한 순수 래퍼."""
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        future = pool.submit(run_fn, scan_id)
+        try:
+            future.result(timeout=timeout)
+        except TimeoutError:
+            session.rollback()
+            with session.begin():
+                session.execute(
+                    update(Scan)
+                    .where(Scan.id == scan_id)
+                    .values(status="failed", error="전체 시간 초과")
+                )
+            # 타임아웃된 스레드는 백그라운드에서 정리되도록 분리한다.
+            # (with 블록 사용 시 __exit__에서 완료까지 대기하므로 사용 금지)
+            pool.shutdown(wait=False, cancel_futures=True)
+            return
+        pool.shutdown(wait=True)
+    except Exception as exc:  # noqa: BLE001 — record and keep polling
+        session.rollback()
+        with session.begin():
+            session.execute(
+                update(Scan).where(Scan.id == scan_id).values(status="failed", error=str(exc)[:500])
+            )
+
+
 def main() -> None:
     signal.signal(signal.SIGTERM, _handle_sigterm)
     try:
@@ -98,32 +132,7 @@ def main() -> None:
             if scan_id is None:
                 _sleep_chunk(2.0)
                 continue
-            pool = ThreadPoolExecutor(max_workers=1)
-            try:
-                future = pool.submit(run_scan, scan_id)
-                try:
-                    future.result(timeout=TOTAL_SCAN_TIMEOUT_SECONDS)
-                except TimeoutError:
-                    session.rollback()
-                    with session.begin():
-                        session.execute(
-                            update(Scan)
-                            .where(Scan.id == scan_id)
-                            .values(status="failed", error="전체 시간 초과")
-                        )
-                    # 타임아웃된 스레드는 백그라운드에서 정리되도록 분리한다.
-                    # (with 블록 사용 시 __exit__에서 완료까지 대기하므로 사용 금지)
-                    pool.shutdown(wait=False, cancel_futures=True)
-                    continue
-                pool.shutdown(wait=True)
-            except Exception as exc:  # noqa: BLE001 — record and keep polling
-                session.rollback()
-                with session.begin():
-                    session.execute(
-                        update(Scan)
-                        .where(Scan.id == scan_id)
-                        .values(status="failed", error=str(exc)[:500])
-                    )
+            _run_scan_guarded(session, scan_id)
 
 
 if __name__ == "__main__":

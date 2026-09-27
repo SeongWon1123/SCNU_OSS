@@ -229,13 +229,17 @@ def get_scan(scan_id: UUID, db: DbSession, t: str = "") -> Any:
 
     # Token-less: score only for scans the owner agreed to share (consent).
     public = scan.consent
+    progress = scan.meta.get("progress")
+    if not public and isinstance(progress, dict):
+        # Non-consented: keep step/pct for the status page, never finding counts.
+        progress = {k: v for k, v in progress.items() if k != "counts"}
     limited = ScanLimited(
         id=scan.id,
         status=scan.status,
         score=scan.score if public else None,
         grade=scan.grade if public else None,
         score_detail=scan.score_detail if public else None,
-        progress=scan.meta.get("progress"),
+        progress=progress,
         message="상세는 스캔 생성자만 볼 수 있습니다",
     )
     return limited.model_dump()

@@ -133,6 +133,28 @@ def test_get_without_token_returns_limited_fields():
         assert "repo_url" not in body
 
 
+def test_get_without_token_hides_progress_counts_for_non_consented():
+    counts = {"secrets": 2, "security": 1, "regulation": 0}
+    ids = {}
+    for consent in (False, True):
+        inserted = _insert_done_scan(f"t-{_uid()}", "repo", consent=consent)
+        with Session(bind=deps.engine) as session:
+            scan = session.get(Scan, uuid.UUID(inserted["id"]))
+            scan.meta = {"progress": {"step": "done", "pct": 100, "counts": counts}}
+            session.commit()
+        ids[consent] = inserted
+
+    private = client.get(f"/api/scans/{ids[False]['id']}").json()
+    assert private["progress"] == {"step": "done", "pct": 100}
+    assert private["score"] is None
+
+    public = client.get(f"/api/scans/{ids[True]['id']}").json()
+    assert public["progress"]["counts"] == counts
+
+    owner = client.get(f"/api/scans/{ids[False]['id']}?t={ids[False]['token']}").json()
+    assert owner["meta"]["progress"]["counts"] == counts
+
+
 @pytest.fixture()
 def limited_settings():
     app.dependency_overrides[get_settings] = lambda: Settings(

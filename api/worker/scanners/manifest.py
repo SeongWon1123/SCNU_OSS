@@ -15,9 +15,10 @@ from typing import Any
 
 from worker import catalog as catalog_mod
 from worker.clone import scan_path
+from worker.paths import rules_dir
 from worker.scanners import ScannerResult
 
-RULES_DIR = "/app/rules"
+RULES_DIR = str(rules_dir())
 MANIFEST_NAMES = ("package.json", "requirements.txt", "pyproject.toml", "Pipfile")
 SKIP_DIRS = {
     ".git",

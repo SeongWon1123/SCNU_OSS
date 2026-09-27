@@ -6,11 +6,12 @@ import subprocess
 from typing import Any
 
 from worker.clone import scan_path
+from worker.paths import rules_dir
 from worker.preflight import ScanFailure
 from worker.scanners import ScannerResult, is_test_scope, repo_rel_path
 
 TIMEOUT = 120
-RULES_DIR = "/app/rules"
+RULES_DIR = str(rules_dir())
 MAX_SNIPPET_CHARS = 300
 PER_RULE_LIMIT = 200
 

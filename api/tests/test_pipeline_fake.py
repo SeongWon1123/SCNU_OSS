@@ -36,9 +36,15 @@ REG_RULES = ("R1", "R2", "R3", "R5", "R6", "R7")
 
 
 @pytest.fixture(autouse=True)
-def _scan_root():
-    """The api test container has no /scan tmpfs (worker-only); create and clean it."""
-    os.makedirs(clone.SCAN_ROOT, exist_ok=True)
+def _scan_root(tmp_path_factory, monkeypatch):
+    """The api test container has no /scan tmpfs (worker-only); create and clean it.
+
+    A non-root CI runner cannot create /scan, so there the root moves to a pytest tmp dir.
+    """
+    try:
+        os.makedirs(clone.SCAN_ROOT, exist_ok=True)
+    except PermissionError:
+        monkeypatch.setattr(clone, "SCAN_ROOT", str(tmp_path_factory.mktemp("scan")))
     yield
     for entry in Path(clone.SCAN_ROOT).iterdir():
         if entry.is_dir():
@@ -123,7 +129,7 @@ def test_full_pipeline_fake_positive(tmp_path, monkeypatch):
     assert counts["regulation"] == sum(1 for f in findings if f.axis == "regulation")
     for f in findings:
         assert not f.file_path.startswith("/"), f.file_path
-        assert "/scan/" not in (f.file_path or ""), f.file_path
+        assert clone.SCAN_ROOT + "/" not in (f.file_path or ""), f.file_path
 
 
 def test_full_pipeline_fake_negative_regulation_zero(tmp_path, monkeypatch):

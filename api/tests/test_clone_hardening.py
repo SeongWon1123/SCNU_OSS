@@ -25,9 +25,15 @@ MSG_TOO_BIG = "저장소 용량이 상한을 넘습니다"
 
 
 @pytest.fixture(autouse=True)
-def _scan_root():
-    """The api test container has no /scan tmpfs (worker-only); create and clean it."""
-    os.makedirs(clone.SCAN_ROOT, exist_ok=True)
+def _scan_root(tmp_path_factory, monkeypatch):
+    """The api test container has no /scan tmpfs (worker-only); create and clean it.
+
+    A non-root CI runner cannot create /scan, so there the root moves to a pytest tmp dir.
+    """
+    try:
+        os.makedirs(clone.SCAN_ROOT, exist_ok=True)
+    except PermissionError:
+        monkeypatch.setattr(clone, "SCAN_ROOT", str(tmp_path_factory.mktemp("scan")))
     yield
     for entry in Path(clone.SCAN_ROOT).iterdir():
         if entry.is_dir():

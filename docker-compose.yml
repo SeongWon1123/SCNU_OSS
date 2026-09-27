@@ -23,15 +23,26 @@ services:
         - "GITLEAKS_VERSION=8.30.1"
     # api/worker share api/Dockerfile and differ only by command (PROMPTS.md:45);
     # without this the base image's default CMD (python3) exits 0 and restart-loops.
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # --no-access-log: request lines carry owner tokens (?t=...), so they must not
+    # reach container logs. No /repo mount: nothing reads it at runtime (rules and
+    # app code are baked into the image).
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    mem_limit: 512m
+    pids_limit: 256
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     env_file:
       - path: .env
         required: false
     ports:
       - "127.0.0.1:8000:8000"
-    volumes:
-      - .:/repo:ro
     depends_on:
       db:
         condition: service_healthy

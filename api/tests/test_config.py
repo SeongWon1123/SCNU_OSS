@@ -1,4 +1,5 @@
-"""Settings contract: the 14 keys of .env.example (docs/PROMPTS.md:50)."""
+"""Settings contract: the keys of .env.example — PROMPTS.md:50's 14 plus the two
+service-wide scan caps (security hardening todo 3)."""
 
 from app.config import Settings
 
@@ -13,6 +14,8 @@ ENV_KEYS = [
     "max_total_mb",
     "daily_limit_per_ip",
     "rate_limit_bypass_ips",
+    "max_queued_scans",
+    "global_daily_scan_limit",
     "domain",
     "fallback_domain",
     "acme_email",
@@ -20,7 +23,7 @@ ENV_KEYS = [
 ]
 
 
-def test_settings_defines_exactly_the_14_env_keys():
+def test_settings_defines_exactly_the_16_env_keys():
     assert sorted(Settings.model_fields) == sorted(ENV_KEYS)
 
 
@@ -36,6 +39,8 @@ def test_settings_defaults_match_env_example(monkeypatch):
     assert settings.max_file_mb == 5
     assert settings.max_total_mb == 300
     assert settings.daily_limit_per_ip == 100
+    assert settings.max_queued_scans == 20
+    assert settings.global_daily_scan_limit == 1000
     assert settings.github_token == ""
     assert settings.s3_bucket == ""
 

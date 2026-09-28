@@ -15,10 +15,24 @@ PROMPTS.md:103(sample 수정 금지)·:192(GLM 양성 추가 권한 없음)의 �
 """
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
-SEMGREP_CONFIG = Path("/repo/rules/kr-regulation.yaml")
+
+def _repo_root() -> Path:
+    """REPODOC_REPO_ROOT > CI 체크아웃(parents[2]) > 컨테이너 /repo 마운트 순으로 리포 루트를 찾는다."""
+    env_root = os.environ.get("REPODOC_REPO_ROOT")
+    if env_root:
+        return Path(env_root)
+    checkout = Path(__file__).resolve().parents[2]
+    if (checkout / "rules" / "kr-regulation.yaml").is_file() and (checkout / "sample").is_dir():
+        return checkout
+    return Path("/repo")
+
+
+REPO_ROOT = _repo_root()
+SEMGREP_CONFIG = REPO_ROOT / "rules" / "kr-regulation.yaml"
 SEMGREP_TIMEOUT_SEC = 300
 
 # PROMPTS.md:107 — 11개 룰 id. 순서는 kr-regulation.yaml 선언 순서.
@@ -78,7 +92,7 @@ def _counts_by_rule(results: list[dict]) -> dict[str, int]:
 
 
 def test_positive_sample_each_rule_fires_at_least_once():
-    results = _run_semgrep("/repo/sample/positive")
+    results = _run_semgrep(str(REPO_ROOT / "sample" / "positive"))
     counts = _counts_by_rule(results)
     for rule_id in EXPECTED_RULE_IDS:
         assert counts.get(rule_id, 0) >= 1, (
@@ -87,10 +101,10 @@ def test_positive_sample_each_rule_fires_at_least_once():
 
 
 def test_negative_sample_zero_findings():
-    results = _run_semgrep("/repo/sample/negative")
+    results = _run_semgrep(str(REPO_ROOT / "sample" / "negative"))
     assert results == [], f"sample/negative must yield 0 findings, got {results}"
 
 
 def test_self_scan_rules_and_docs_zero_findings():
-    results = _run_semgrep("/repo/rules", "/repo/docs")
+    results = _run_semgrep(str(REPO_ROOT / "rules"), str(REPO_ROOT / "docs"))
     assert results == [], f"rules/ + docs/ self-scan must yield 0 findings, got {results}"
